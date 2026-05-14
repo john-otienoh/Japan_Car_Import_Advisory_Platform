@@ -1,0 +1,28 @@
+1
+{'top_viewed_models': ['LAND CRUISER PRADO', 'CX5', 'FORESTER', 'VEZEL', 'NOTE', 'HARRIER', 'RAV4', 'COROLLA FIELDER', 'HILUX', 'XTRAIL'], 'car_brands': ['Toyota', 'Honda', 'Nissan', 'Mazda', 'Suzuki', 'Mitsubishi', 'Daihatsu', 'Subaru', 'Hino', 'Volkswagen', 'Bmw', 'Isuzu', 'Lexus', 'Mercedes', 'Audi', 'Volvo', 'Land Rover', 'Ford', 'Peugeot', 'Jeep', 'Citroen', 'Jaguar', 'Hyundai', 'Kia'], 'car_body_types': ['Sedan', 'Coupe', 'Hatchback', 'Station Wagon', 'SUV', 'Pick up', 'Van', 'Mini Van', 'Wagon', 'Convertible', 'Bus', 'Truck', 'Heavy Equipment'], 'inventory_location': ['Japan', 'Korea', 'Singapore', 'Thailand', 'China', 'UK', 'UAE']}
+
+Total make URLs: 24
+https://www.sbtjapan.com/used-cars/maker/toyota
+https://www.sbtjapan.com/used-cars/maker/honda
+https://www.sbtjapan.com/used-cars/maker/nissan
+https://www.sbtjapan.com/used-cars/maker/mazda
+https://www.sbtjapan.com/used-cars/maker/suzuki
+https://www.sbtjapan.com/used-cars/maker/mitsubishi
+https://www.sbtjapan.com/used-cars/maker/daihatsu
+https://www.sbtjapan.com/used-cars/maker/subaru
+https://www.sbtjapan.com/used-cars/maker/hino
+https://www.sbtjapan.com/used-cars/maker/volkswagen
+https://www.sbtjapan.com/used-cars/maker/bmw
+https://www.sbtjapan.com/used-cars/maker/isuzu
+https://www.sbtjapan.com/used-cars/maker/lexus
+https://www.sbtjapan.com/used-cars/maker/mercedes
+https://www.sbtjapan.com/used-cars/maker/audi
+https://www.sbtjapan.com/used-cars/maker/volvo
+https://www.sbtjapan.com/used-cars/maker/land rover
+https://www.sbtjapan.com/used-cars/maker/ford
+https://www.sbtjapan.com/used-cars/maker/peugeot
+https://www.sbtjapan.com/used-cars/maker/jeep
+https://www.sbtjapan.com/used-cars/maker/citroen
+https://www.sbtjapan.com/used-cars/maker/jaguar
+https://www.sbtjapan.com/used-cars/maker/hyundai
+https://www.sbtjapan.com/used-cars/maker/kia

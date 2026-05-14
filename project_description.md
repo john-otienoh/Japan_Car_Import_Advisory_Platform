@@ -48,3 +48,7 @@ The final solution should include:
 - Final presentation
 
 Project by [LuxDevHq](https://github.com/LuxDevHQ/LuxDevHQ-Projects/blob/main/japan-car-price-prediction-project.md)
+
+https://www.sbtjapan.com/used-cars/search?make_id=7&model%5B%5D=IMPREZA&isModel=1
+https://www.sbtjapan.com/used-cars/search?make_id=8&model%5B%5D=ROCKY&isModel=1
+https://www.sbtjapan.com/used-cars/search?make_id=2&model%5B%5D=ALLEX&isModel=1
