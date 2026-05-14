@@ -1,0 +1,4 @@
+['LAND CRUISER PRADO', 'CX5', 'FORESTER', 'VEZEL', 'NOTE', 'HARRIER', 'RAV4', 'COROLLA FIELDER', 'HILUX', 'XTRAIL']
+['Toyota', 'Honda', 'Nissan', 'Mazda', 'Suzuki', 'Mitsubishi', 'Daihatsu', 'Subaru', 'Hino', 'Volkswagen', 'Bmw', 'Isuzu', 'Lexus', 'Mercedes', 'Audi', 'Volvo', 'Land Rover', 'Ford', 'Peugeot', 'Jeep', 'Citroen', 'Jaguar', 'Hyundai', 'Kia']
+['Japan', 'Korea', 'Singapore', 'Thailand', 'China', 'UK', 'UAE']
+['Sedan', 'Coupe', 'Hatchback', 'Station Wagon', 'SUV', 'Pick up', 'Van', 'Mini Van', 'Wagon', 'Convertible', 'Bus', 'Truck', 'Heavy Equipment']
