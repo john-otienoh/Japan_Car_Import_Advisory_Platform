@@ -368,7 +368,7 @@ predicted_price_usd
 
 ## Contributing
 
-This is a [LuxDevHQ](https://github.com/LuxDevHQ) project. To contribute:
+This is a [LuxDevHq](https://github.com/LuxDevHQ/LuxDevHQ-Projects/blob/main/japan-car-price-prediction-project.md) project. To contribute:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/beforward-scraper`
