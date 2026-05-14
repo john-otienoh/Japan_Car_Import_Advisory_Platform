@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs, urlencode
 import time
 import sys
+from utils import get_total_pages, HEADERS
 
 BASE_URL = "https://www.sbtjapan.com/used-cars"
 
@@ -70,7 +71,7 @@ def extract_car_brands_data():
     """
     cars_by_maker_dict = {}
     data = extract_home_page_data(url=BASE_URL)
-    car_brands = data.get("car_brands")
+    car_brands = data["car_brands"]
 
     for brand in car_brands:
         brand_url = f"{BASE_URL}/maker/{brand}"
@@ -93,6 +94,88 @@ def extract_car_brands_data():
             continue
     return cars_by_maker_dict
 
+def parse_products(soup):
+    products = []
+    cards = soup.select("a.card-product__wrap")
+
+    for card in cards:
+        relative_url = card.get("href", "")
+        full_url = f"https://www.sbtjapan.com{relative_url}"
+
+        # Title
+        title_tag = card.select_one("span.card-product__product")
+        title = title_tag.get_text(strip=True) if title_tag else "N/A"
+
+        # Vehicle Price
+        sale_price_tag = card.select_one("ins.card-product__price-sale-value span.card-product__price")
+        reg_price_tag  = card.select_one("div.card-product__vehicle-price span.card-product__price")
+        vehicle_price  = (sale_price_tag or reg_price_tag)
+        vehicle_price  = vehicle_price.get_text(strip=True) if vehicle_price else "N/A"
+
+        total_price_tag = card.select_one("div.card-product__total-price span.card-product__price")
+        total_price = total_price_tag.get_text(strip=True) if total_price_tag else "N/A"
+
+        # Stock ID 
+        stock_tag = card.select_one("span.card-product__stock-value")
+        stock_id  = stock_tag.get_text(strip=True) if stock_tag else "N/A"
+
+        # Inventory Location
+        location_tag = card.select_one("span.card-product__location-value")
+        location     = location_tag.get_text(strip=True) if location_tag else "N/A"
+
+        spec_map = {
+            "-mileage":          "mileage",
+            "-transmission":     "transmission",
+            "-drive-type":       "drive_type",
+            "-steering-type":    "steering",
+            "-fuel-type":        "fuel_type",
+            "-body-color":       "color",
+            "-door":             "doors",
+            "-seats":            "seats",
+        }
+        specs = {}
+        for span in card.select("span.card-product__status"):
+            classes = span.get("class", [])
+            for modifier, key in spec_map.items():
+                if modifier in classes:
+                    specs[key] = span.get_text(strip=True)
+        
+        products.append({
+            "title":         title,
+            "stock_id":      stock_id,
+            "vehicle_price": vehicle_price,
+            "total_price":   total_price,
+            "location":      location,
+            "url":           full_url,
+            **specs,          # unpack mileage, transmission, etc. as top-level keys
+        })
+
+    return products
+
+def scrape(base_url):
+    all_products = []
+    # print(f"Fetching page 1: {base_url}")
+    response = requests.get(base_url, headers=HEADERS)
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    total_pages = get_total_pages(soup)
+    # print(f"Total pages detected: {total_pages}")
+    all_products.extend(parse_products(soup))
+    for page in range(2, total_pages + 1):
+        paginated_url = f"{base_url}&page={page}"
+        # print(f"Fetching page {page}: {paginated_url}")
+
+        response = requests.get(paginated_url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        all_products.extend(parse_products(soup))
+
+        time.sleep(1.5)
+
+    return all_products
 def scrape_all_pages(base_search_url):
     """
     Scrape all pages from SBT Japan search results with proper pagination handling.
@@ -120,7 +203,7 @@ def scrape_all_pages(base_search_url):
         else:
             url = f"{base_search_url}?page={page}"
         
-        print(f"Scraping page {page}...", file=sys.stderr)
+        # print(f"Scraping page {page}...", file=sys.stderr)
         
         try:
             response = requests.get(url, headers={
@@ -145,7 +228,7 @@ def scrape_all_pages(base_search_url):
                     all_products.append(full_url)
                     # print(full_url)  # This goes to stdout for file redirection
             
-            print(f"Found {len(products)} products on page {page} (Total: {len(all_products)})", file=sys.stderr)
+            # print(f"Found {len(products)} products on page {page} (Total: {len(all_products)})", file=sys.stderr)
             
             # Check for next page using the actual pagination structure
             next_page_exists = False
@@ -193,9 +276,14 @@ if __name__ == "__main__":
     # if cars_data:
     #     for brand, models in cars_data.items():
     #         print(f"Brand: {brand} - Models: {models}")
+    URL = "https://www.sbtjapan.com/used-cars/search?make_id=4&model%5B0%5D=ACCORD&isModel=1"
 
-    search_url = "https://www.sbtjapan.com/used-cars/search?make_id=4&model%5B0%5D=ACCORD&isModel=1&page"
-    products = scrape_all_pages(search_url)
-    print(f"\nTotal products scraped: {len(products)}")
-    for p in products:
-        print(p)
+    car_brands = extract_car_brands_data()
+    result = [item for brand in car_brands.values() for item in brand]
+    for brand in result:
+        url = f"https://www.sbtjapan.com/used-cars/search?make_id=4&model%5B0%5D={brand}&isModel=1"
+        print(f"The url: {url}")
+        car_data_urls = scrape(url)
+        for car in car_data_urls:
+            print(car['url'])
+    
