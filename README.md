@@ -108,46 +108,145 @@ All scrapers target vehicles manufactured **2018 onwards** only.
 
 ## Project Structure
 
-```
-japan-car-import-platform/
+```japan-car-import-platform/
 │
-├── scrapers/
-│   ├── sbtjapan/
-│   │   ├── scraper.py          # Main scraper — homepage, brands, search, detail
-│   │   └── utils.py            # get_total_pages(), HEADERS, fetch()
-│   ├── carfromjapan/           # 🔲 Pending
-│   ├── beforward/              # 🔲 Pending
-│   ├── aaajapan/               # 🔲 Pending
-│   └── japanesecartrade/       # 🔲 Pending
-│
-├── database/
-│   ├── schema.sql              # 🔲 Pending — table definitions
-│   └── models.py               # 🔲 Pending — ORM models
-│
-├── pipeline/
-│   ├── clean.py                # 🔲 Pending — data cleaning
-│   └── transform.py            # 🔲 Pending — feature engineering
-│
-├── calculator/
-│   └── import_cost.py          # 🔲 Pending — KRA + all fees
-│
-├── ml/
-│   ├── train.py                # 🔲 Pending — model training
-│   ├── predict.py              # 🔲 Pending — inference
-│   └── evaluate.py             # 🔲 Pending — metrics
-│
-├── dashboard/
-│   └── app.py                  # 🔲 Pending — Streamlit/Flask app
-│
-├── data/
-│   ├── raw/                    # Raw scraped data
-│   └── cleaned/                # Processed data ready for ML
-│
-├── docs/
-│   └── import_cost_methodology.md
-│
+├── .env                          # DB credentials, API keys (never commit)
+├── .env.example                  # Template showing required env vars
+├── .gitignore
 ├── requirements.txt
-└── README.md
+├── README.md
+│
+│
+├── scrapers/                     # ── EXTRACTION LAYER ──────────────────
+│   │
+│   ├── base.py                   # Shared: fetch(), HEADERS, get_total_pages()
+│   │
+│   ├── sbtjapan/
+│   │   ├── __init__.py
+│   │   ├── scraper.py            # get_homepage_details(), get_search_urls(),
+│   │   │                         # get_brand_models(), scrape_all()
+│   │   ├── parser.py             # parse_card(), parse_car_specs(),
+│   │   │                         # parse_car_info(), parse_car_dimensions(),
+│   │   │                         # parse_car_options(), parse_gallery_images()
+│   │   └── utils.py              # build_search_url(), get_make_urls()
+│   │
+│   ├── beforward/                # 🔲 Pending
+│   │   ├── __init__.py
+│   │   ├── scraper.py
+│   │   └── parser.py
+│   │
+│   ├── carfromjapan/             # 🔲 Pending
+│   │   ├── __init__.py
+│   │   ├── scraper.py
+│   │   └── parser.py
+│   │
+│   ├── aaajapan/                 # 🔲 Pending
+│   │   ├── __init__.py
+│   │   ├── scraper.py
+│   │   └── parser.py
+│   │
+│   └── japanesecartrade/         # 🔲 Pending
+│       ├── __init__.py
+│       ├── scraper.py
+│       └── parser.py
+│
+│
+├── database/                     # ── DATABASE LAYER ────────────────────
+│   ├── __init__.py
+│   ├── connection.py             # psycopg2 / SQLAlchemy engine setup
+│   ├── schema.sql                # Full PostgreSQL schema (all CREATE TABLE)
+│   │
+│   └── models/                  # SQLAlchemy ORM models (one file per table)
+│       ├── __init__.py
+│       ├── brand.py              # brands table
+│       ├── model.py              # models table
+│       ├── listing.py            # car_listings table
+│       ├── image.py              # car_images table
+│       ├── option.py             # options, option_categories, car_options
+│       ├── dimension.py          # car_dimensions table
+│       ├── lookup.py             # body_types, fuel_types, drive_types,
+│       │                         # transmission_types, inventory_locations
+│       └── scrape_log.py         # scrape_log table
+│
+│
+├── ingestion/                    # ── LOAD LAYER ────────────────────────
+│   ├── __init__.py
+│   ├── insert.py                 # Functions to upsert scraped dicts → DB
+│   └── run.py                    # Entry point: scrape → clean → insert
+│
+│
+├── pipeline/                     # ── TRANSFORM LAYER ───────────────────
+│   ├── __init__.py
+│   ├── clean.py                  # Strip commas, units, nullify "-" values
+│   │                             # e.g. "112,000km" → 112000
+│   │                             #      "2,000cc"   → 2000
+│   │                             #      "-kg"       → NULL
+│   ├── normalise.py              # Standardise make/model casing across
+│   │                             # platforms, deduplicate cross-platform
+│   ├── filter.py                 # Keep only year >= 2018
+│   └── feature_engineering.py   # Derive age_years, price_per_km, etc.
+│
+│
+├── calculator/                   # ── IMPORT COST LAYER ─────────────────
+│   ├── __init__.py
+│   ├── kra_rates.py              # KRA duty rates (updatable constants)
+│   │                             #   IMPORT_DUTY    = 0.25
+│   │                             #   VAT            = 0.16
+│   │                             #   IDF_LEVY       = 0.035
+│   │                             #   RDL            = 0.02
+│   │                             #   EXCISE_RATES   = {<1500cc: 0.20, ...}
+│   ├── shipping.py               # Shipping + marine insurance estimates
+│   ├── port_charges.py           # Port, clearing, registration fees
+│   ├── import_cost.py            # Main calculator:
+│   │                             #   calculate_landed_cost(fob, engine_cc,
+│   │                             #     year, usd_kes_rate) → full breakdown
+│   └── local_market.py           # 🔲 Fetch/compare Cheki Kenya / PigiaMe
+│
+│
+├── ml/                           # ── ML LAYER ──────────────────────────
+│   ├── __init__.py
+│   ├── prepare.py                # Load cleaned data, encode categoricals,
+│   │                             # train/test split
+│   ├── train.py                  # XGBoost / LightGBM model training
+│   ├── evaluate.py               # RMSE, MAE, R² metrics + feature importance
+│   ├── predict.py                # Load saved model, return predicted price
+│   └── models/                  # Saved model artefacts
+│       └── .gitkeep
+│
+│
+├── dashboard/                    # ── PRESENTATION LAYER ────────────────
+│   ├── __init__.py
+│   ├── app.py                    # Streamlit entry point
+│   │
+│   └── pages/
+│       ├── search.py             # Filter listings by make/model/year/budget
+│       ├── import_calculator.py  # Full landed cost breakdown
+│       ├── compare.py            # Import cost vs local market price
+│       ├── price_predictor.py    # ML model input form → predicted FOB price
+│       └── market_insights.py    # Charts: price by brand, mileage dist. etc.
+│
+│
+├── data/                         # ── DATA STORAGE ──────────────────────
+│   ├── raw/                      # JSON dumps straight from scrapers
+│   │   └── .gitkeep
+│   ├── cleaned/                  # CSVs after pipeline/clean.py
+│   │   └── .gitkeep
+│   └── exports/                  # Final exports for analysis / ML
+│       └── .gitkeep
+│
+│
+├── tests/                        # ── TESTS ─────────────────────────────
+│   ├── __init__.py
+│   ├── test_scraper.py           # Test parse_card(), get_total_pages()
+│   ├── test_clean.py             # Test mileage/price normalisation
+│   ├── test_calculator.py        # Test KRA duty calculations
+│   └── test_predict.py           # Test ML model inference
+│
+│
+└── docs/
+    ├── import_cost_methodology.md  # KRA formula + rate sources
+    ├── data_dictionary.md          # Field definitions for all DB tables
+    └── architecture.md             # System diagram + data flow
 ```
 
 ---
