@@ -1,0 +1,5 @@
+{
+    'top_viewed_models': ['CX5', 'LAND CRUISER PRADO', 'FORESTER', 'VEZEL', 'NOTE', 'HARRIER', 'RAV4', 'COROLLA FIELDER', 'HILUX', 'XTRAIL'], 
+    'car_brands': ['Toyota', 'Honda', 'Nissan', 'Mazda', 'Suzuki', 'Mitsubishi', 'Daihatsu', 'Subaru', 'Hino', 'Volkswagen', 'Bmw', 'Isuzu', 'Lexus', 'Mercedes', 'Audi', 'Volvo', 'Land Rover', 'Ford', 'Peugeot', 'Jeep', 'Citroen', 'Jaguar', 'Hyundai', 'Kia'], 
+    'car_body_types': ['Sedan', 'Coupe', 'Hatchback', 'Station Wagon', 'SUV', 'Pick up', 'Van', 'Mini Van', 'Wagon', 'Convertible', 'Bus', 'Truck', 'Heavy Equipment'], 
+    'inventory_location': ['Japan', 'Korea', 'Singapore', 'Thailand', 'China', 'UK', 'UAE']}

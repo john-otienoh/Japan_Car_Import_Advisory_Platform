@@ -1,7 +1,7 @@
 import requests
 from urllib.parse import urljoin, quote
 import time
-from scrappers.base import fetch, get_total_pages
+from ..base import fetch, get_total_pages
 
 BASE_URL = "https://www.sbtjapan.com/used-cars"
 
@@ -269,35 +269,39 @@ def scrape_all(brand_filter=None):
         print(f"  Running total: {len(all_cars)} cars")
 
     return all_cars
-    
-if __name__ == "__main__":
-    soup = fetch(BASE_URL)
-    homepage_data = get_homepage_details()
-    print(homepage_data)
 
-    toyota_models = get_brand_models("toyota")
-    print(toyota_models)
-    all_models = []
-    for brand in homepage_data["car_brands"]:
-        all_models.extend(get_brand_models(brand))
-        time.sleep(1)
+def main():
 
-    print(f"Total models across all brands: {len(all_models)}")
+    # # soup = fetch(BASE_URL)
+    # homepage_data = get_homepage_details()
+    # print(homepage_data)
 
-    make_urls = get_make_urls(homepage_data)
-    print(f"\nTotal make URLs: {len(make_urls)}")
-    for url in make_urls:
-        print(url)
+    # toyota_models = get_brand_models("toyota")
+    # print(toyota_models)
+    # all_models = []
+    # for brand in homepage_data["car_brands"]:
+    #     all_models.extend(get_brand_models(brand))
+    #     time.sleep(1)
 
-    search_urls = get_search_urls(homepage_data)
-    print(f"\nTotal search URLs: {len(search_urls)}")
-    for url in search_urls:
-        print(url)
+    # print(f"Total models across all brands: {len(all_models)}")
 
-    cars = scrape_all(brand_filter="jaguar")
-    print(f"\nDone. Total Jaguar cars scraped: {len(cars)}")
+    # make_urls = get_make_urls(homepage_data)
+    # print(f"\nTotal make URLs: {len(make_urls)}")
+    # for url in make_urls:
+    #     print(url)
+
+    # search_urls = get_search_urls(homepage_data)
+    # print(f"\nTotal search URLs: {len(search_urls)}")
+    # for url in search_urls:
+    #     print(url)
+
+    cars = scrape_all(brand_filter="mitsubishi")
+    print(f"\nDone. Total Land Rover cars scraped: {len(cars)}")
 
     for car in cars:      
         for k, v in car.items():
             print(f"  {k}: {v}")
         print()
+
+if __name__ == "__main__":
+    main()

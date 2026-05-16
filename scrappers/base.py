@@ -11,6 +11,9 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
+
 def fetch(url: str):
     """
     Fetch a URL and return a BeautifulSoup object of the parsed HTML.
