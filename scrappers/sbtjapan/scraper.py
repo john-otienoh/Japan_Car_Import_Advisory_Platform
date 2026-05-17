@@ -4,11 +4,12 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 BASE_URL    = "https://www.sbtjapan.com/used-cars/search"
-OUTPUT_DIR  = Path("data/raw/sbtjapan/data")          # JSON files saved here
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_DIR = PROJECT_ROOT / "data" / "raw" / "sbtjapan"
 LOG_DIR     = Path("logs")              # Log files saved here
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -42,6 +43,17 @@ def fetch(url: str):
     response.raise_for_status()
     return BeautifulSoup(response.text, "html.parser")
 
+def save_all_cars_to_json(all_cars: list, filename: str = "all_sbt_cars.json") -> Path:
+    """
+    Saves a list of car dictionaries to a single JSON file inside OUTPUT_DIR.
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUTPUT_DIR / filename
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(all_cars, f, ensure_ascii=False, indent=2)
+    log.info(f"Saved {len(all_cars)} cars to {out_path}")
+    return out_path
+
 def get_total_pages(soup) -> int:
     """
     Extract the total number of pages from pagination links.
@@ -65,7 +77,7 @@ def get_total_pages(soup) -> int:
             pages.append(int(text))
     return max(pages) if pages else 1
 
-def get_car_detail_urls(search_url: str) -> list:
+def get_car_detail_urls() -> list:
     """
     Scrapes all pages of a search URL and returns a flat list of
     individual car detail URLs e.g. https://www.sbtjapan.com/used-cars/AI1937
@@ -101,7 +113,7 @@ def get_car_detail_urls(search_url: str) -> list:
 
         try:
             soup = fetch(paged_url)
-        except requests.RequestException as e:
+        except requests.exceptions.RequestException as e:
             log.error(f"Failed on page {page}: {e}")
             break
 
@@ -294,23 +306,43 @@ def parse_individual_car_page(soup, car_url):
         **info,      
         **engagement,
         "image_urls":  image_urls,
-        "options": options,
+        "car_options": options,
     }
-
+    stock_id = identification.get('stock_id', '?')
     log.info(
-        f"Parsed {identification.get('stock_id', '?')} | "
+        f"Parsed {stock_id} | "
         f"{header.get('title', '?')} | "
         f"{len(image_urls)} image_urls | "
         f"{sum(len(v) for v in options.values())} available options"
     )
     return car
 
+def scrape_detail(car_url):
+    """
+    Fetches a single car detail page, parses all sections,
+    saves to JSON, and returns the data dict.
+    """
+    try:
+        soup = fetch(car_url)
+    except requests.RequestException as e:
+        log.error(f"Failed to fetch {car_url}: {e}")
+        return {}
+    return parse_individual_car_page(soup, car_url)
+
 if __name__ == "__main__":
-    car_url = "https://www.sbtjapan.com/used-cars/AI1937"
-    soup = fetch(BASE_URL)
-    # print(parse_individual_car_page(soup, car_url))
-    print(get_total_pages(soup))
-    urls = get_car_detail_urls(BASE_URL)
-    print(f"Total: {len(urls)}")
-    for url in urls:
-        print(url)
+    detail_urls = get_car_detail_urls()   
+
+    all_cars_data = []
+    for idx, car_url in enumerate(detail_urls, 1):
+        log.info(f"Scraping {idx}/{len(detail_urls)}: {car_url}")
+        car_dict = scrape_detail(car_url)
+        if car_dict:
+            all_cars_data.append(car_dict)
+        time.sleep(1.5)  
+
+    # Save all collected cars into one JSON file
+    if all_cars_data:
+        save_all_cars_to_json(all_cars_data)
+        print(f"\n Saved {len(all_cars_data)} cars to data/raw/sbtjapan/sbtjapan_all_cars.json")
+    else:
+        print("No cars were scraped.")
