@@ -964,10 +964,10 @@ def parse_engagement(soup) -> dict:
     Extracts view count, favourite count, and review rating/count
     from the review block.
     """
-    view_tag     = soup.select_one("div.product-detail__view-counter")
-    fav_tag      = soup.select_one("div.product-detail__favorite-counter")
-    rating_tag   = soup.select_one("span.sr-only")
-    review_tag   = soup.select_one("a.text-m")
+    view_tag = soup.select_one("div.product-detail__view-counter")
+    fav_tag = soup.select_one("div.product-detail__favorite-counter")
+    rating_tag = soup.select_one("span.avg-score")
+    review_tag = soup.select_one("span.reviews-qa-label")
 
     return {
         "view_count":     view_tag.get_text(strip=True) if view_tag else "N/A",
