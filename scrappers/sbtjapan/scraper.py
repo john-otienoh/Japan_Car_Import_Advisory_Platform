@@ -97,7 +97,7 @@ def get_car_detail_urls() -> list:
     log.info(f"Fetching page 1: {BASE_URL}")
     soup = fetch(BASE_URL)
 
-    total_pages = get_total_pages(soup) - 5739
+    total_pages = get_total_pages(soup)
     log.info(f"Total pages: {total_pages}")
 
     # Extract from page 1 — already fetched, no extra request
@@ -332,17 +332,18 @@ def scrape_detail(car_url):
 if __name__ == "__main__":
     detail_urls = get_car_detail_urls()   
 
-    all_cars_data = []
-    for idx, car_url in enumerate(detail_urls, 1):
-        log.info(f"Scraping {idx}/{len(detail_urls)}: {car_url}")
-        car_dict = scrape_detail(car_url)
-        if car_dict:
-            all_cars_data.append(car_dict)
-        time.sleep(1.5)  
+    print(detail_urls)
+    # all_cars_data = []
+    # for idx, car_url in enumerate(detail_urls, 1):
+    #     log.info(f"Scraping {idx}/{len(detail_urls)}: {car_url}")
+    #     car_dict = scrape_detail(car_url)
+    #     if car_dict:
+    #         all_cars_data.append(car_dict)
+    #     time.sleep(1.5)  
 
-    # Save all collected cars into one JSON file
-    if all_cars_data:
-        save_all_cars_to_json(all_cars_data)
-        print(f"\n Saved {len(all_cars_data)} cars to data/raw/sbtjapan/sbtjapan_all_cars.json")
-    else:
-        print("No cars were scraped.")
+    # # Save all collected cars into one JSON file
+    # if all_cars_data:
+    #     save_all_cars_to_json(all_cars_data)
+    #     print(f"\n Saved {len(all_cars_data)} cars to data/raw/sbtjapan/sbtjapan_all_cars.json")
+    # else:
+    #     print("No cars were scraped.")
