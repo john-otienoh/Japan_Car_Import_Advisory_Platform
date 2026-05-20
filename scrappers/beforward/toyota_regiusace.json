@@ -1,0 +1,48 @@
+{
+  "title": "2012 TOYOTA",
+  "year": "2012",
+  "make": "TOYOTA",
+  "model": "",
+  "stock_id": "CC260209",
+  "model_code": "CBF-TRH216K",
+  "mileage": "145,779 km",
+  "engine": "2,690cc",
+  "transmission": "Automatic",
+  "drive_type": "4wheel drive",
+  "steering": "Right",
+  "fuel_type": "Petrol",
+  "doors": "5",
+  "seats": "2 (5)",
+  "color": "White",
+  "location": "OSAKA",
+  "grade": "WIDE SUPER GL",
+  "body_type": "",
+  "month": "",
+  "manufacture_year_month": "",
+  "currency": "$",
+  "vehicle_price": "7,970",
+  "total_price": "11,256",
+  "vehicle_details": {
+    "Make": "TOYOTA",
+    "Model": "",
+    "Body color": "White",
+    "Body Type": "",
+    "Doors": "5",
+    "Seats": "2 (5)"
+  },
+  "specifications": {
+    "Dimension": "4.90×1.88×2.10 m",
+    "M3": "19.345",
+    "Vehicle Weight": "1,990 kg",
+    "Gross Vehicle Weight": "",
+    "Max Loading Capacity": "1.00 ton"
+  },
+  "features": [
+    "Power Steering",
+    "Power Window",
+    "A/C",
+    "ABS",
+    "Airbag"
+  ],
+  "image_count": "0"
+}

@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 26.2.3.2 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="00:00:00"/>
+	<style type="text/css">
+		@page { size: 8.27in 11.69in; margin: 0.79in }
+		p { margin-bottom: 0.1in; line-height: 115%; background: transparent }
+		h1 { margin-bottom: 0.08in; background: transparent; page-break-after: avoid }
+		h1.western { font-weight: bold; font-size: 18pt; font-family: "Liberation Sans", sans-serif }
+		h1.cjk { font-weight: bold; font-size: 18pt; font-family: "AR PL SungtiL GB" }
+		h1.ctl { font-weight: bold; font-family: "Noto Sans Devanagari"; font-size: 18pt }
+		blockquote { margin-right: 0.39in; margin-left: 0.39in; background: transparent }
+		h2 { margin-top: 0.14in; margin-bottom: 0.08in; background: transparent; page-break-after: avoid }
+		h2.western { font-weight: bold; font-size: 16pt; font-family: "Liberation Sans", sans-serif }
+		h2.cjk { font-weight: bold; font-size: 16pt; font-family: "AR PL SungtiL GB" }
+		h2.ctl { font-weight: bold; font-family: "Noto Sans Devanagari"; font-size: 16pt }
+		pre { font-size: 10pt; font-family: "Liberation Mono", monospace; background: transparent }
+		h3 { margin-top: 0.1in; margin-bottom: 0.08in; background: transparent; page-break-after: avoid }
+		h3.western { font-weight: bold; font-size: 14pt; font-family: "Liberation Sans", sans-serif }
+		h3.cjk { font-weight: bold; font-size: 14pt; font-family: "AR PL SungtiL GB" }
+		h3.ctl { font-weight: bold; font-family: "Noto Sans Devanagari"; font-size: 14pt }
+		td p { widows: 0; orphans: 0; background: transparent }
+		th p { widows: 0; text-align: center; orphans: 0; font-weight: bold; background: transparent }
+		a:link { color: #000080; text-decoration: underline }
+	</style>
+</head>
+<body lang="en-US" link="#000080" vlink="#800000" dir="ltr"><h1 class="western">
+KenJapAI — Week 1 Daily Checklist</h1>
+<blockquote>Japan → Kenya Car Import Intelligence Platform<br/>
+<b>Goal:</b>
+Check off every task before midnight each day. Links are reference
+material — read them <i>before</i> you code, not after.</blockquote>
+<hr/>
+
+<h2 class="western">Day 1 — Project Setup, Infrastructure &amp;
+Scraping Pipeline</h2>
+<p><font face="Liberation Mono, monospace">Hours 0–12 · Phase:
+Infrastructure &amp; Web Scraping</font></p>
+<h3 class="western">Morning — Hours 1–6: Environment &amp; Schema</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Create GitHub repository</b> with the following folder
+	structure:</p>
+	<pre style="margin-bottom: 0.2in; background: #e1e1e1">kenjapai/<br/>
+├── scraper/<br/>
+├── etl/<br/>
+├── ml/<br/>
+├── api/<br/>
+├── frontend/<br/>
+├── notebooks/<br/>
+├── docs/<br/>
+├── docker-compose.yml<br/>
+└── .env.example</pre><blockquote>
+	📖 <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository">GitHub
+	— Creating a repo</a><br/>
+📖 <a href="https://docs.python-guide.org/writing/structure/">Structuring
+	Python projects</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Set up Python virtual environment</b> (<font face="Liberation Mono, monospace">python
+	-m venv .venv</font>) and create <font face="Liberation Mono, monospace">requirements.txt</font>
+	with initial dependencies: <font face="Liberation Mono, monospace">scrapy</font>,
+	<font face="Liberation Mono, monospace">playwright</font>,
+	<font face="Liberation Mono, monospace">sqlalchemy</font>,
+	<font face="Liberation Mono, monospace">psycopg2-binary</font>,
+	<font face="Liberation Mono, monospace">python-dotenv</font>, <font face="Liberation Mono, monospace">redis</font></p>
+	<blockquote>📖 <a href="https://docs.python.org/3/library/venv.html">Python
+	venv docs</a><br/>
+📖 <a href="https://pip.pypa.io/en/stable/reference/requirements-file-format/">pip
+	&amp; requirements.txt best practices</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>docker-compose.yml</b></font>
+	with three services: <font face="Liberation Mono, monospace">postgres:15</font>,
+	<font face="Liberation Mono, monospace">redis:7-alpine</font>,
+	<font face="Liberation Mono, monospace">dpage/pgadmin4</font></p>
+	<blockquote>📖 <a href="https://docs.docker.com/compose/gettingstarted/">Docker
+	Compose getting started</a><br/>
+📖 <a href="https://hub.docker.com/_/postgres">Official
+	Postgres Docker image</a><br/>
+📖 <a href="https://hub.docker.com/_/redis">Redis
+	Docker image</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Run </b><font face="Liberation Mono, monospace"><b>docker
+	compose up -d</b></font> and verify all three containers are healthy
+	(<font face="Liberation Mono, monospace">docker ps</font>)</p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Set up </b><font face="Liberation Mono, monospace"><b>pre-commit</b></font><b>
+	hooks</b>: <font face="Liberation Mono, monospace">black</font>,
+	<font face="Liberation Mono, monospace">isort</font>, <font face="Liberation Mono, monospace">flake8</font></p>
+	<blockquote>📖 <a href="https://pre-commit.com/">pre-commit
+	official docs</a><br/>
+📖 <a href="https://black.readthedocs.io/en/stable/">Black
+	formatter</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Design and write </b><font face="Liberation Mono, monospace"><b>schema.sql</b></font>
+	— create these tables in PostgreSQL:</p>
+	<ul>
+		<li><p><font face="Liberation Mono, monospace">raw_listings</font>
+		(id, source_platform, raw_json, scraped_at, url)</p></li>
+		<li><p><font face="Liberation Mono, monospace">cleaned_listings</font>
+		(id, make, model, year, mileage_km, engine_cc, fuel_type,
+		transmission, body_type, price_usd, price_kes, source_platform,
+		listing_url, scraped_at)</p></li>
+		<li><p><font face="Liberation Mono, monospace">platforms</font>,
+		<font face="Liberation Mono, monospace">makes</font>, <font face="Liberation Mono, monospace">models</font>,
+		<font face="Liberation Mono, monospace">price_predictions</font>,
+		<font face="Liberation Mono, monospace">import_estimates</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.postgresql.org/docs/current/sql-createtable.html">PostgreSQL
+	CREATE TABLE docs</a><br/>
+📖 <a href="https://www.geeksforgeeks.org/database-normalization-normal-forms/">Database
+	schema design — normalization primer</a><br/>
+📖 <a href="https://docs.sqlalchemy.org/en/20/orm/quickstart.html">SQLAlchemy
+	ORM quickstart</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Confirm schema is live</b> in pgAdmin (<font face="Liberation Mono, monospace">localhost:5050</font>)</p></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: Scrapers</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Read and understand Scrapy fundamentals</b> before writing a
+	single spider</p>
+	<blockquote>📖 <a href="https://docs.scrapy.org/en/latest/intro/tutorial.html">Scrapy
+	official tutorial</a><br/>
+📖 <a href="https://docs.scrapy.org/en/latest/topics/architecture.html">Scrapy
+	architecture overview</a><br/>
+📖 <a href="https://docs.scrapy.org/en/latest/topics/item-pipeline.html">Scrapy
+	items &amp; pipelines</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Spider #1 — BE FORWARD</b> (<font face="Liberation Mono, monospace">beforward.jp</font>)</p>
+	<ul>
+		<li><p>☐ Handle pagination (detect last page)</p></li>
+		<li><p>☐ Filter: <font face="Liberation Mono, monospace">year &gt;=
+		2018</font></p></li>
+		<li><p>☐ Extract: make, model, year, mileage, engine cc, fuel,
+		transmission, body type, price (USD), listing URL</p></li>
+		<li><p>☐ Store raw JSON to <font face="Liberation Mono, monospace">raw_listings</font>
+		table</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://docs.scrapy.org/en/latest/topics/spiders.html">Scrapy
+	spiders docs</a><br/>
+📖 <a href="https://docs.scrapy.org/en/latest/topics/selectors.html">CSS
+	&amp; XPath selectors in Scrapy</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Spider #2 — SBT Japan</b> (<font face="Liberation Mono, monospace">sbtjapan.com</font>)
+	— JS-rendered, use Playwright</p>
+	<ul>
+		<li><p>☐ Install <font face="Liberation Mono, monospace">scrapy-playwright</font>:
+		<font face="Liberation Mono, monospace">pip install
+		scrapy-playwright &amp;&amp; playwright install</font></p></li>
+		<li><p>☐ Set <font face="Liberation Mono, monospace">PLAYWRIGHT_LAUNCH_OPTIONS</font>
+		in <font face="Liberation Mono, monospace">settings.py</font></p></li>
+		<li><p>☐ Extract same fields as Spider #1</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://github.com/scrapy-plugins/scrapy-playwright">scrapy-playwright
+	GitHub</a><br/>
+📖 <a href="https://playwright.dev/python/docs/intro">Playwright
+	Python docs</a><br/>
+📖 <a href="https://scrapeops.io/python-scrapy-playbook/scrapy-playwright/">Handling
+	JavaScript-rendered pages</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Spider #3 — Car From Japan</b> (<font face="Liberation Mono, monospace">carfromjapan.com</font>)</p>
+	<ul>
+		<li><p>☐ Add rotating user-agent middleware</p></li>
+		<li><p>☐ Set <font face="Liberation Mono, monospace">DOWNLOAD_DELAY
+		= 2</font> in <font face="Liberation Mono, monospace">settings.py</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://docs.scrapy.org/en/latest/topics/downloader-middleware.html">Scrapy
+	downloader middleware</a><br/>
+📖 <a href="https://github.com/TeamHG-Memex/scrapy-rotating-proxies">scrapy-rotating-proxies</a><br/>
+📖
+	<a href="https://pypi.org/project/fake-useragent/">Fake user agents
+	— fake-useragent library</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Spider #4 — AAA Japan</b> (<font face="Liberation Mono, monospace">aaajapan.com</font>)</p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Spider #5 — JapaneseCarTrade / JCT</b>
+	(<font face="Liberation Mono, monospace">japanesecartrade.com</font>)</p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Verify</b> at least <b>500 raw listings</b> are in the
+	<font face="Liberation Mono, monospace">raw_listings</font> table</p></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 1 Deliverables</h3>
+<ul>
+	<li><p>☐ Raw scraper codebase (5 spiders)</p></li>
+	<li><p>☐ Docker Compose stack running (Postgres + Redis +
+	pgAdmin)</p></li>
+	<li><p>☐ PostgreSQL schema v1 applied</p></li>
+	<li><p>☐ ≥ 500 raw listings in <font face="Liberation Mono, monospace">raw_listings</font></p></li>
+	<li><p>☐ Git repo with meaningful first commit</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 2 — ETL Pipeline, Data Cleaning &amp;
+Database Finalisation</h2>
+<p><font face="Liberation Mono, monospace">Hours 12–24 · Phase:
+ETL &amp; Data Engineering</font></p>
+<h3 class="western">Morning — Hours 1–6: Cleaning Module</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Read about ETL pipeline patterns</b> before writing code</p>
+	<blockquote>📖 <a href="https://www.databricks.com/glossary/etl-pipeline">ETL
+	vs ELT — what's the difference</a><br/>
+📖 <a href="https://pandas.pydata.org/docs/getting_started/intro_tutorials/04_reshaping_tidy_data.html">pandas
+	data cleaning guide</a><br/>
+📖 <a href="https://docs.profiling.ydata.ai/4.6/getting-started/quickstart/">ydata-profiling
+	(pandas profiling)</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build </b><font face="Liberation Mono, monospace"><b>etl/cleaner.py</b></font>
+	— normalise price fields:</p>
+	<ul>
+		<li><p>☐ Parse JPY/USD amounts from raw strings (strip <font face="Liberation Mono, monospace">$</font>,
+		<font face="Liberation Mono, monospace">,</font>, <font face="Liberation Mono, monospace">¥</font>)</p></li>
+		<li><p>☐ Convert JPY → USD using a static or fetched rate</p></li>
+		<li><p>☐ Convert USD → KES using the CBK daily rate (or
+		OpenExchangeRates free tier)</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.centralbank.go.ke/forex-exchange-rates/">CBK
+	exchange rates portal</a><br/>
+📖 <a href="https://openexchangerates.org/api/latest.json?app_id=YOUR_KEY">Open
+	Exchange Rates API (free)</a><br/>
+📖 <a href="https://docs.python.org/3/library/re.html">regex
+	for currency parsing</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Standardise make/model names</b> using fuzzy matching (e.g.
+	&quot;Toyota&quot; vs &quot;TOYOTA&quot; vs &quot;toyota&quot;)</p>
+	<blockquote>📖 <a href="https://github.com/maxbachmann/RapidFuzz">rapidfuzz
+	library (fast fuzzy matching)</a><br/>
+📖 <a href="https://github.com/seatgeek/thefuzz">thefuzz
+	(original fuzzywuzzy)</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Handle nulls and type coercion</b>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">year</font>:
+		cast to int, drop rows where <font face="Liberation Mono, monospace">year
+		&lt; 2018</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">mileage_km</font>:
+		cast to int, impute median per make+model+year group</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">engine_cc</font>:
+		impute median per make+model group</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">price_usd</font>:
+		drop rows with price = 0 or null</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Feature engineering</b> — add these derived columns:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">age_years =
+		2025 - year</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">price_per_cc =
+		price_usd / engine_cc</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">mileage_band</font>
+		= <font face="Liberation Mono, monospace">Low (&lt;50k)</font>,
+		<font face="Liberation Mono, monospace">Medium (50–120k)</font>,
+		<font face="Liberation Mono, monospace">High (&gt;120k)</font></p></li>
+		<li><p>☐ One-hot encode: <font face="Liberation Mono, monospace">fuel_type</font>,
+		<font face="Liberation Mono, monospace">transmission</font>,
+		<font face="Liberation Mono, monospace">body_type</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://pandas.pydata.org/docs/reference/api/pandas.cut.html">pandas
+	cut() for binning</a><br/>
+📖 <a href="https://scikit-learn.org/stable/modules/preprocessing.html#encoding-categorical-features">sklearn
+	LabelEncoder / OneHotEncoder</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build </b><font face="Liberation Mono, monospace"><b>etl/validator.py</b></font>
+	using Great Expectations:</p>
+	<ul>
+		<li><p>☐ Null % check: <font face="Liberation Mono, monospace">price_usd</font>
+		nulls &lt; 5%</p></li>
+		<li><p>☐ Range checks: <font face="Liberation Mono, monospace">year</font>
+		between 2018–2025, <font face="Liberation Mono, monospace">mileage_km</font>
+		between 0–500,000, <font face="Liberation Mono, monospace">price_usd</font>
+		between 500–200,000</p></li>
+		<li><p>☐ Duplicate detection on <font face="Liberation Mono, monospace">(make,
+		model, year, mileage_km, source_platform)</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://docs.greatexpectations.io/docs/tutorials/quickstart/">Great
+	Expectations quickstart</a><br/>
+📖 <a href="https://docs.greatexpectations.io/docs/reference/learn/conceptual_guides/expectation_classes">GE
+	core concepts — Expectations</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: Airflow &amp; Exports</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Install and configure Apache Airflow</b> (local or Docker)</p>
+	<blockquote>📖 <a href="https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html">Airflow
+	quickstart (Docker)</a><br/>
+📖 <a href="https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/dags.html">Airflow
+	DAG writing guide</a><br/>
+📖 <a href="https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html">Airflow
+	TaskFlow API (modern style)</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>dags/scrape_and_clean_dag.py</b></font>:</p>
+	<ul>
+		<li><p>☐ Task 1: <font face="Liberation Mono, monospace">scrape_all_platforms</font></p></li>
+		<li><p>☐ Task 2: <font face="Liberation Mono, monospace">validate_raw</font></p></li>
+		<li><p>☐ Task 3: <font face="Liberation Mono, monospace">clean_and_load</font></p></li>
+		<li><p>☐ Task 4: <font face="Liberation Mono, monospace">notify_slack_or_log</font></p></li>
+		<li><p>☐ Set retry: 3 retries, 5-minute retry delay</p></li>
+		<li><p>☐ Dead-letter queue: failed records → Redis list
+		<font face="Liberation Mono, monospace">failed_listings</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://airflow.apache.org/docs/apache-airflow/stable/core-concepts/xcoms.html">Airflow
+	XComs (passing data between tasks)</a><br/>
+📖 <a href="https://redis-py.readthedocs.io/en/stable/">Redis
+	Python client (redis-py)</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Finalise </b><font face="Liberation Mono, monospace"><b>cleaned_listings</b></font><b>
+	table</b>:</p>
+	<ul>
+		<li><p>☐ Add composite index on <font face="Liberation Mono, monospace">(make,
+		model, year)</font></p></li>
+		<li><p>☐ Add index on <font face="Liberation Mono, monospace">source_platform</font></p></li>
+		<li><p>☐ Create materialized view <font face="Liberation Mono, monospace">ml_features_view</font>
+		with all engineered columns</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.postgresql.org/docs/current/indexes.html">PostgreSQL
+	indexes</a><br/>
+📖 <a href="https://www.postgresql.org/docs/current/rules-materializedviews.html">PostgreSQL
+	materialized views</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Export cleaned dataset</b>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">data/cleaned_listings.csv</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">data/cleaned_listings.parquet</font>
+		(use <font face="Liberation Mono, monospace">pandas.to_parquet</font>)</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_parquet.html">pandas
+	to_parquet docs</a><br/>
+📖 <a href="https://towardsdatascience.com/the-best-format-to-save-pandas-data-414dca023e0d">Why
+	Parquet over CSV</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Generate data profiling report</b> in a Jupyter notebook using
+	<font face="Liberation Mono, monospace">ydata-profiling</font></p></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 2 Deliverables</h3>
+<ul>
+	<li><p>☐ <font face="Liberation Mono, monospace">etl/cleaner.py</font>
+	and <font face="Liberation Mono, monospace">etl/validator.py</font>
+	modules</p></li>
+	<li><p>☐ Airflow DAG running end-to-end</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">cleaned_listings</font>
+	table with ≥ 1,000 rows</p></li>
+	<li><p>☐ Data quality GE report (HTML)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">cleaned_listings.csv</font>
+	and <font face="Liberation Mono, monospace">.parquet</font> exports</p></li>
+	<li><p>☐ Schema v2 with indexes and materialized view</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 3 — Exploratory Data Analysis &amp; KRA
+Import Cost Research</h2>
+<p><font face="Liberation Mono, monospace">Hours 24–36 · Phase:
+EDA &amp; Domain Research</font></p>
+<h3 class="western">Morning — Hours 1–6: EDA Notebooks</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Open Jupyter Lab</b> and create <font face="Liberation Mono, monospace">notebooks/01_pricing_eda.ipynb</font></p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>EDA Notebook #1 — Pricing Analysis</b>:</p>
+	<ul>
+		<li><p>☐ Price distribution histograms per make (top 10 makes)</p></li>
+		<li><p>☐ Box plots: price by year (2018–2024)</p></li>
+		<li><p>☐ Scatter: mileage vs price, coloured by make</p></li>
+		<li><p>☐ Bar chart: median price per source platform (compare
+		SBT vs BE FORWARD vs others)</p></li>
+		<li><p>☐ Outlier analysis: IQR method, flag and exclude</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://matplotlib.org/stable/tutorials/pyplot.html">matplotlib
+	plotting guide</a><br/>
+📖 <a href="https://seaborn.pydata.org/tutorial.html">seaborn
+	statistical data visualisation</a><br/>
+📖 <a href="https://plotly.com/python/plotly-express/">Plotly
+	Express for interactive plots</a><br/>
+📖 <a href="https://www.thoughtco.com/what-is-the-interquartile-range-rule-3126244">IQR
+	outlier detection explained</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>EDA Notebook #2 — Feature Correlations</b>
+	(<font face="Liberation Mono, monospace">notebooks/02_feature_correlations.ipynb</font>):</p>
+	<ul>
+		<li><p>☐ Correlation heatmap (all numeric features)</p></li>
+		<li><p>☐ Violin plots: price by fuel type, by transmission type</p></li>
+		<li><p>☐ Body type pricing tiers (sedan vs SUV vs hatchback)</p></li>
+		<li><p>☐ Engine cc vs price curve (line plot with confidence
+		band)</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.corr.html">pandas
+	correlation methods</a><br/>
+📖 <a href="https://seaborn.pydata.org/generated/seaborn.heatmap.html">seaborn
+	heatmap</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write down your 5 most interesting findings</b> as markdown
+	cells in the notebook — these become slides later</p></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: KRA Research &amp;
+Local Market Data</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Study the KRA CRSP (Current Retail Selling Price) system</b></p>
+	<ul>
+		<li><p>☐ Understand how CRSP value is determined (not FOB —
+		it's KRA's own valuation)</p></li>
+		<li><p>☐ Note the KEBS age restriction: <b>max 8 years old</b>
+		at the time of import</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.kra.go.ke/individual/filing-paying/types-of-taxes/customs-border-control/motor-vehicles">KRA
+	— Motor vehicle duty guide</a><br/>
+📖 <a href="https://www.kebs.org/index.php/technical/standards/vehicle-standards">KEBS
+	vehicle import age limits</a><br/>
+📖 <a href="https://crsp.kra.go.ke/">KRA
+	CRSP lookup portal</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Document the full KRA import duty formula</b> in
+	<font face="Liberation Mono, monospace">docs/import_cost_formula.md</font>:</p>
+	<ul>
+		<li><p>☐ <b>CIF</b> = FOB price + freight + insurance</p></li>
+		<li><p>☐ <b>Import Declaration Fee (IDF)</b>: 2.25% of CIF</p></li>
+		<li><p>☐ <b>Railway Development Levy (RDL)</b>: 2% of CIF</p></li>
+		<li><p>☐ <b>Customs Duty</b>: 25% of CIF (for passenger cars)</p></li>
+		<li><p>☐ <b>Excise Duty</b>: based on engine cc brackets (see
+		table below)</p></li>
+		<li><p>☐ <b>VAT</b>: 16% of (CIF + Customs + Excise)</p>
+		<table width="100%" cellpadding="4" cellspacing="0">
+			<col width="128*"/>
+			<col width="128*"/>
+			<thead>
+				<tr valign="top">
+					<th width="50%" style="border-top: 1px solid #000000; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+						Engine cc</p>
+					</th>
+					<th width="50%" style="border: 1px solid #000000; padding: 0.04in"><p align="left">
+						Excise Duty Rate</p>
+					</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr valign="top">
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+						≤ 1,000 cc</p>
+					</td>
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p align="left">
+						20%</p>
+					</td>
+				</tr>
+				<tr valign="top">
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+						1,001–2,000 cc</p>
+					</td>
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p align="left">
+						30%</p>
+					</td>
+				</tr>
+				<tr valign="top">
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+						&gt; 2,000 cc</p>
+					</td>
+					<td width="50%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p align="left">
+						35%</p>
+					</td>
+				</tr>
+			</tbody>
+		</table></li>
+	</ul>
+	<p></p>
+	<blockquote>📖 <a href="https://www.kra.go.ke/individual/filing-paying/types-of-taxes/excise-duty/excise-duty-on-motor-vehicles">KRA
+	Excise Duty Act (motor vehicles)</a><br/>
+📖 <a href="https://www.kra.go.ke/images/publications/East_African_Community_Customs_Management_Act.pdf">Customs
+	&amp; Border Control — tariff schedules</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Document port &amp; clearing costs</b> in
+	<font face="Liberation Mono, monospace">docs/import_cost_formula.md</font>:</p>
+	<ul>
+		<li><p>☐ Mombasa port handling (RORO): ~ KES 15,000–25,000</p></li>
+		<li><p>☐ CFS (Container Freight Station) charges if
+		containerised</p></li>
+		<li><p>☐ Clearing agent fee: 3–5% of CIF value (typical)</p></li>
+		<li><p>☐ KPA documentation charges</p></li>
+		<li><p>☐ Transit to Nairobi (SGR or road): KES 30,000–80,000</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.kpa.co.ke/">Kenya Ports
+	Authority tariff schedule</a><br/>
+📖 <a href="https://www.krc.co.ke/cargo/">SGR
+	cargo rates — Madaraka Express</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build Kenya local market price dataset</b>:</p>
+	<ul>
+		<li><p>☐ Write a simple <font face="Liberation Mono, monospace">requests</font>
+		+ <font face="Liberation Mono, monospace">BeautifulSoup</font>
+		scraper for Cheki.co.ke or PigiaMe</p></li>
+		<li><p>☐ Target: 2018+ vehicles, same makes as Japan dataset</p></li>
+		<li><p>☐ Store in <font face="Liberation Mono, monospace">local_market_listings</font>
+		table</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://beautiful-soup-4.readthedocs.io/en/latest/">BeautifulSoup
+	docs</a><br/>
+📖 <a href="https://requests.readthedocs.io/en/latest/user/quickstart/">requests
+	library quickstart</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Produce a visual price gap analysis</b> — for top 5 makes,
+	plot:</p>
+	<ul>
+		<li><p><font face="Liberation Mono, monospace">Japan total import
+		cost</font> vs <font face="Liberation Mono, monospace">Kenya local
+		market price</font> (stacked bar or grouped bar)</p></li>
+	</ul>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 3 Deliverables</h3>
+<ul>
+	<li><p>☐ <font face="Liberation Mono, monospace">notebooks/01_pricing_eda.ipynb</font>
+	(complete with findings)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">notebooks/02_feature_correlations.ipynb</font></p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">docs/import_cost_formula.md</font>
+	(full formula with sources)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">data/local_market_prices.csv</font></p></li>
+	<li><p>☐ Price gap analysis chart (saved as PNG)</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 4 — Machine Learning Model: Japan Car Price
+Predictor</h2>
+<p><font face="Liberation Mono, monospace">Hours 36–48 · Phase: ML
+Modelling</font></p>
+<h3 class="western">Morning — Hours 1–6: Baselines &amp; Feature
+Prep</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Read about the ML workflow</b> before opening a notebook</p>
+	<blockquote>📖 <a href="https://scikit-learn.org/stable/supervised_learning.html">scikit-learn
+	user guide — supervised learning</a><br/>
+📖 <a href="https://developers.google.com/machine-learning/crash-course/ml-intro">ML
+	workflow overview — Google Developers</a><br/>
+📖 <a href="https://towardsdatascience.com/target-encoding-for-categorical-features-in-machine-learning-models-c75b76753b69">Target
+	encoding for high-cardinality categoricals</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Create </b><font face="Liberation Mono, monospace"><b>notebooks/03_ml_price_predictor.ipynb</b></font></p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Feature prep</b>:</p>
+	<ul>
+		<li><p>☐ Load <font face="Liberation Mono, monospace">ml_features_view</font>
+		from PostgreSQL</p></li>
+		<li><p>☐ Drop columns: <font face="Liberation Mono, monospace">listing_url</font>,
+		<font face="Liberation Mono, monospace">scraped_at</font>, <font face="Liberation Mono, monospace">raw_id</font></p></li>
+		<li><p>☐ One-hot encode: <font face="Liberation Mono, monospace">fuel_type</font>,
+		<font face="Liberation Mono, monospace">transmission</font>,
+		<font face="Liberation Mono, monospace">body_type</font>,
+		<font face="Liberation Mono, monospace">source_platform</font></p></li>
+		<li><p>☐ Log-transform target: <font face="Liberation Mono, monospace">y
+		= log1p(price_usd)</font> (reduces skew)</p></li>
+		<li><p>☐ Stratified 80/20 train/test split on <font face="Liberation Mono, monospace">make</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://numpy.org/doc/stable/reference/generated/numpy.log1p.html">numpy
+	log1p</a><br/>
+📖 <a href="https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html">sklearn
+	train_test_split stratified</a><br/>
+📖 <a href="https://scikit-learn.org/stable/modules/pipeline.html">sklearn
+	Pipeline</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Baseline models</b> — run all three, record MAE/RMSE/R²:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">LinearRegression</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">Ridge(alpha=1.0)</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">RandomForestRegressor(n_estimators=100)</font>
+		— also extract <font face="Liberation Mono, monospace">.feature_importances_</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://towardsdatascience.com/what-are-the-best-metrics-to-evaluate-your-regression-model-418ca4d5e601">Regression
+	metrics explained — MAE, RMSE, R²</a><br/>
+📖 <a href="https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.cross_val_score.html">sklearn
+	cross_val_score</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: XGBoost, SHAP &amp;
+MLflow</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>XGBoost hyperparameter tuning with Optuna</b>:</p>
+	<ul>
+		<li><p>☐ Install: <font face="Liberation Mono, monospace">pip
+		install xgboost lightgbm optuna</font></p></li>
+		<li><p>☐ Define Optuna objective function: optimise RMSE on
+		validation fold</p></li>
+		<li><p>☐ Run 100 trials, <font face="Liberation Mono, monospace">n_jobs=-1</font></p></li>
+		<li><p>☐ Retrieve best params, retrain final model</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://xgboost.readthedocs.io/en/stable/python/python_api.html">XGBoost
+	Python API</a><br/>
+📖 <a href="https://lightgbm.readthedocs.io/en/stable/Python-Intro.html">LightGBM
+	Python quickstart</a><br/>
+📖 <a href="https://optuna.readthedocs.io/en/stable/tutorial/10_key_features/001_first.html">Optuna
+	— hyperparameter optimisation</a><br/>
+📖 <a href="https://optuna.readthedocs.io/en/stable/tutorial/20_recipes/003_attributes.html">Optuna
+	+ XGBoost tutorial</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>5-fold cross-validation</b> on final XGBoost model — confirm
+	R² ≥ 0.82</p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>SHAP explainability</b>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">pip install
+		shap</font></p></li>
+		<li><p>☐ Generate global summary plot (<font face="Liberation Mono, monospace">shap.summary_plot</font>)</p></li>
+		<li><p>☐ Generate waterfall chart for a single prediction</p></li>
+		<li><p>☐ Save top-5 feature importance as JSON for the API to
+		serve</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://shap.readthedocs.io/en/latest/">SHAP
+	official docs</a><br/>
+📖 <a href="https://shap.readthedocs.io/en/latest/example_notebooks/tabular_examples/tree_based_models/Census+income+classification+with+XGBoost.html">SHAP
+	with XGBoost tutorial</a><br/>
+📖 <a href="https://christophm.github.io/interpretable-ml-book/shap.html">Interpretable
+	ML book — SHAP chapter</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>MLflow experiment tracking</b>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">pip install
+		mlflow</font></p></li>
+		<li><p>☐ Wrap training in <font face="Liberation Mono, monospace">with
+		mlflow.start_run():</font></p></li>
+		<li><p>☐ Log: params, metrics (MAE, RMSE, R²), model artifact,
+		SHAP plot as artifact</p></li>
+		<li><p>☐ Register best model in MLflow Model Registry as
+		<font face="Liberation Mono, monospace">&quot;japan_car_price_v1&quot;</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://mlflow.org/docs/latest/getting-started/intro-quickstart/index.html">MLflow
+	quickstart</a><br/>
+📖 <a href="https://mlflow.org/docs/latest/model-registry.html">MLflow
+	model registry</a><br/>
+📖 <a href="https://mlflow.org/docs/latest/tracking/autolog.html">MLflow
+	autolog for sklearn/XGBoost</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Serialise the model</b>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">joblib.dump(model,
+		'ml/models/xgb_price_v1.pkl')</font></p></li>
+		<li><p>☐ Export to ONNX for portable inference</p></li>
+		<li><p>☐ Write <font face="Liberation Mono, monospace">ml/model_card.md</font>:
+		training data, features, metrics, known limitations, bias notes</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://scikit-learn.org/stable/model_persistence.html">joblib
+	model persistence</a><br/>
+📖 <a href="https://onnx.ai/sklearn-onnx/">ONNX
+	— open neural network exchange</a><br/>
+📖 <a href="https://arxiv.org/abs/1810.03993">Model
+	cards for ML — Google paper</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 4 Deliverables</h3>
+<ul>
+	<li><p>☐ <font face="Liberation Mono, monospace">notebooks/03_ml_price_predictor.ipynb</font></p></li>
+	<li><p>☐ Trained XGBoost/LGBM model (<font face="Liberation Mono, monospace">.pkl</font>
+	file)</p></li>
+	<li><p>☐ MLflow run log (all experiments tracked)</p></li>
+	<li><p>☐ SHAP summary + waterfall plots (saved as PNG)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">ml/model_card.md</font></p></li>
+	<li><p>☐ R² ≥ 0.82 confirmed on test set</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 5 — FastAPI Backend: Cost Calculator +
+Prediction API</h2>
+<p><font face="Liberation Mono, monospace">Hours 48–60 · Phase:
+Backend API Development</font></p>
+<h3 class="western">Morning — Hours 1–6: App Scaffold &amp; Core
+Endpoints</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Read FastAPI fundamentals</b> before writing a line</p>
+	<blockquote>📖 <a href="https://fastapi.tiangolo.com/tutorial/">FastAPI
+	official tutorial</a><br/>
+📖 <a href="https://docs.pydantic.dev/latest/">Pydantic
+	v2 — data validation</a><br/>
+📖 <a href="https://fastapi.tiangolo.com/tutorial/sql-databases/">Async
+	SQLAlchemy with FastAPI</a><br/>
+📖 <a href="https://alembic.sqlalchemy.org/en/latest/tutorial.html">Alembic
+	migrations</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Scaffold </b><font face="Liberation Mono, monospace"><b>api/main.py</b></font>
+	with routers:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">GET  /health</font>
+		— returns <font face="Liberation Mono, monospace">{&quot;status&quot;:
+		&quot;ok&quot;}</font></p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">GET  /listings</font>
+		— paginated, filterable car listings</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">POST
+		/import-cost</font> — full import cost breakdown</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">POST /predict</font>
+		— ML price prediction</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">GET  /compare</font>
+		— Japan import total vs local market price</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Define Pydantic request/response models</b> in <font face="Liberation Mono, monospace">api/schemas.py</font>:</p>
+	<pre style="margin-bottom: 0.2in; background: #e1e1e1">class ImportCostRequest(BaseModel):<br/>
+    make: str<br/>
+    model: str<br/>
+    year: int<br/>
+    engine_cc: int<br/>
+    fob_price_usd: float<br/>
+    shipping_cost_usd: float = 1800.0<br/>
+<br/>
+class ImportCostResponse(BaseModel):<br/>
+    cif_usd: float<br/>
+    idf_kes: float<br/>
+    rdl_kes: float<br/>
+    customs_duty_kes: float<br/>
+    excise_duty_kes: float<br/>
+    vat_kes: float<br/>
+    port_charges_kes: float<br/>
+    clearing_fee_kes: float<br/>
+    transit_kes: float<br/>
+    total_landed_kes: float<br/>
+    exchange_rate: float</pre></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Implement </b><font face="Liberation Mono, monospace"><b>POST
+	/import-cost</b></font> using the formula from Day 3</p>
+	<ul>
+		<li><p>☐ Fetch live USD/KES rate from CBK or Open Exchange Rates</p></li>
+		<li><p>☐ Return itemised breakdown</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.python-httpx.org/">httpx async
+	HTTP client</a><br/>
+📖 <a href="https://fastapi.tiangolo.com/tutorial/background-tasks/">FastAPI
+	background tasks</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Implement </b><font face="Liberation Mono, monospace"><b>GET
+	/compare</b></font>:</p>
+	<ul>
+		<li><p>☐ Query <font face="Liberation Mono, monospace">cleaned_listings</font>
+		for matched Japan car (make + model + year ± 1)</p></li>
+		<li><p>☐ Query <font face="Liberation Mono, monospace">local_market_listings</font>
+		for same match</p></li>
+		<li><p>☐ Return both prices + <font face="Liberation Mono, monospace">savings_kes</font>
+		field</p></li>
+	</ul>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: ML Endpoint, Auth &amp;
+Tests</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Implement </b><font face="Liberation Mono, monospace"><b>POST
+	/predict</b></font>:</p>
+	<ul>
+		<li><p>☐ Load model from MLflow registry or local <font face="Liberation Mono, monospace">.pkl</font></p></li>
+		<li><p>☐ Apply same preprocessing pipeline used during training</p></li>
+		<li><p>☐ Return: <font face="Liberation Mono, monospace">predicted_price_usd</font>,
+		<font face="Liberation Mono, monospace">confidence_interval</font>,
+		<font face="Liberation Mono, monospace">top_5_shap_features</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://fastapi.tiangolo.com/deployment/manually/">FastAPI
+	— handling ML models</a><br/>
+📖 <a href="https://mlflow.org/docs/latest/models.html#deploy-mlflow-models">Loading
+	MLflow models in production</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Add API key authentication middleware</b>:</p>
+	<pre style="margin-bottom: 0.2in; background: #e1e1e1">from fastapi.security.api_key import APIKeyHeader</pre>
+	<ul>
+		<li><p>☐ Read key from <font face="Liberation Mono, monospace">X-API-Key</font>
+		header</p></li>
+		<li><p>☐ Validate against <font face="Liberation Mono, monospace">.env</font>
+		variable</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://fastapi.tiangolo.com/advanced/security/api-key/">FastAPI
+	security — API keys</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Add Redis-backed rate limiter</b> (100 requests/min per API
+	key)</p>
+	<blockquote>📖 <a href="https://github.com/long2ice/fastapi-limiter">fastapi-limiter</a><br/>
+📖
+	<a href="https://redis.io/docs/latest/develop/use/patterns/rate-limiting/">Redis
+	INCR + EXPIRE pattern for rate limiting</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write test suite</b> in <font face="Liberation Mono, monospace">api/tests/</font>:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">pytest</font> +
+		<font face="Liberation Mono, monospace">httpx.AsyncClient</font></p></li>
+		<li><p>☐ Test <font face="Liberation Mono, monospace">/import-cost</font>
+		with known input → verify each line-item</p></li>
+		<li><p>☐ Test <font face="Liberation Mono, monospace">/predict</font>
+		returns shape and type expected</p></li>
+		<li><p>☐ Confirm ≥ 80% coverage with <font face="Liberation Mono, monospace">pytest-cov</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://fastapi.tiangolo.com/tutorial/testing/">Testing
+	FastAPI with pytest</a><br/>
+📖 <a href="https://pytest-cov.readthedocs.io/en/latest/">pytest-cov
+	coverage reports</a><br/>
+📖 <a href="https://docs.locust.io/en/stable/quickstart.html">Locust
+	load testing</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Verify OpenAPI docs</b> are auto-generated at
+	<font face="Liberation Mono, monospace">http://localhost:8000/docs</font></p></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 5 Deliverables</h3>
+<ul>
+	<li><p>☐ FastAPI app with all 5 endpoints live</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">POST
+	/import-cost</font> returns correct itemised breakdown</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">POST /predict</font>
+	returns price + SHAP features</p></li>
+	<li><p>☐ API key auth + rate limiter working</p></li>
+	<li><p>☐ Pytest suite passing with ≥ 80% coverage</p></li>
+	<li><p>☐ Swagger/OpenAPI docs accessible</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 6 — React Frontend Dashboard</h2>
+<p><font face="Liberation Mono, monospace">Hours 60–72 · Phase:
+Frontend Dashboard</font></p>
+<h3 class="western">Morning — Hours 1–6: Scaffold &amp; Listings
+Page</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Read before coding</b></p>
+	<blockquote>📖 <a href="https://vitejs.dev/guide/">Vite —
+	Getting started</a><br/>
+📖 <a href="https://reactrouter.com/en/main/start/tutorial">React
+	Router v6</a><br/>
+📖 <a href="https://tanstack.com/query/latest/docs/framework/react/overview">TanStack
+	Query (react-query) v5</a><br/>
+📖 <a href="https://zustand-demo.pmnd.rs/">Zustand
+	state management</a><br/>
+📖 <a href="https://tailwindcss.com/docs/installation">Tailwind
+	CSS docs</a><br/>
+📖 <a href="https://recharts.org/en-US/guide">Recharts
+	— React chart library</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Scaffold React + Vite app</b>:</p>
+	<pre style="margin-bottom: 0.2in; background: #e1e1e1">npm create vite@latest frontend -- --template react<br/>
+cd frontend &amp;&amp; npm install<br/>
+npm install tailwindcss react-router-dom @tanstack/react-query axios zustand recharts</pre></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Set up React Router</b> with 5 routes:</p>
+	<ul>
+		<li><p>☐ <font face="Liberation Mono, monospace">/</font> —
+		Analytics dashboard (home)</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">/listings</font>
+		— Car listings browser</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">/calculator</font>
+		— Import cost calculator</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">/predict</font>
+		— ML price predictor</p></li>
+		<li><p>☐ <font face="Liberation Mono, monospace">/compare</font>
+		— Market comparison</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Build the listings browser page</b> (<font face="Liberation Mono, monospace">/listings</font>):</p>
+	<ul>
+		<li><p>☐ Filter sidebar: make, model, year range, mileage range,
+		fuel type, body type, platform</p></li>
+		<li><p>☐ Sortable table with columns: make, model, year,
+		mileage, engine, price (USD), source</p></li>
+		<li><p>☐ Pagination (10/25/50 per page)</p></li>
+		<li><p>☐ Thumbnail gallery toggle</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://tanstack.com/table/latest/docs/introduction">TanStack
+	Table v8 (headless table)</a><br/>
+📖 <a href="https://www.robinwieruch.de/react-filter-component/">React
+	filter/search patterns</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: Calculator, Predictor
+&amp; Analytics</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Build import cost calculator UI</b> (<font face="Liberation Mono, monospace">/calculator</font>):</p>
+	<ul>
+		<li><p>☐ Step 1: Select make + model + year (typeahead dropdown)</p></li>
+		<li><p>☐ Step 2: Enter FOB price (USD) + shipping estimate</p></li>
+		<li><p>☐ Step 3: Show animated itemised cost breakdown in KES</p></li>
+		<li><p>☐ Include a progress bar or stepper component</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://react.dev/learn/sharing-state-between-components">React
+	controlled components — forms</a><br/>
+📖 <a href="https://headlessui.com/react/combobox">Headless
+	UI combobox (autocomplete)</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build ML price predictor UI</b> (<font face="Liberation Mono, monospace">/predict</font>):</p>
+	<ul>
+		<li><p>☐ Input form: make, model, year, mileage, engine cc, fuel
+		type, transmission</p></li>
+		<li><p>☐ Submit → show predicted price (USD) with confidence
+		interval</p></li>
+		<li><p>☐ Render SHAP waterfall chart (horizontal bar chart in
+		Recharts)</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Build price comparison view</b> (<font face="Liberation Mono, monospace">/compare</font>):</p>
+	<ul>
+		<li><p>☐ Search for a make + model + year</p></li>
+		<li><p>☐ Side-by-side card: Japan total landed cost vs Kenya
+		local market price</p></li>
+		<li><p>☐ Savings badge (green if importing is cheaper)</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Build analytics dashboard</b> (home <font face="Liberation Mono, monospace">/</font>):</p>
+	<ul>
+		<li><p>☐ Platform price comparison bar chart (Recharts <font face="Liberation Mono, monospace">BarChart</font>)</p></li>
+		<li><p>☐ Price over year trend line (<font face="Liberation Mono, monospace">LineChart</font>)</p></li>
+		<li><p>☐ Mileage distribution histogram</p></li>
+		<li><p>☐ Top 10 value imports table</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://recharts.org/en-US/examples/SimpleBarChart">Recharts
+	BarChart example</a><br/>
+📖 <a href="https://recharts.org/en-US/examples/SimpleLineChart">Recharts
+	LineChart example</a><br/>
+📖 <a href="https://axios-http.com/docs/example">Axios
+	with React — data fetching</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 6 Deliverables</h3>
+<ul>
+	<li><p>☐ React SPA running at <font face="Liberation Mono, monospace">localhost:5173</font>
+	with 5 routes</p></li>
+	<li><p>☐ Listings browser with working filters + pagination</p></li>
+	<li><p>☐ Import cost calculator (step-by-step wizard UI)</p></li>
+	<li><p>☐ ML price predictor with SHAP output</p></li>
+	<li><p>☐ Market comparison view with savings badge</p></li>
+	<li><p>☐ Analytics dashboard with 4 charts</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Day 7 — Integration, Testing, Deployment &amp;
+Documentation</h2>
+<p><font face="Liberation Mono, monospace">Hours 72–84 · Phase:
+Polish, Deploy &amp; Document</font></p>
+<h3 class="western">Morning — Hours 1–6: Integration Testing &amp;
+Production Build</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>End-to-end smoke test</b>: scraper → ETL → DB → API →
+	frontend</p>
+	<ul>
+		<li><p>☐ Trigger a fresh scraper run manually</p></li>
+		<li><p>☐ Confirm cleaned data lands in <font face="Liberation Mono, monospace">cleaned_listings</font></p></li>
+		<li><p>☐ Hit <font face="Liberation Mono, monospace">/listings</font>
+		API — confirm frontend renders results</p></li>
+		<li><p>☐ Hit <font face="Liberation Mono, monospace">/import-cost</font>
+		— confirm all line items populate in UI</p></li>
+		<li><p>☐ Hit <font face="Liberation Mono, monospace">/predict</font>
+		— confirm prediction + SHAP renders</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Write multi-stage </b><font face="Liberation Mono, monospace"><b>Dockerfile</b></font><b>
+	for the API</b>:</p>
+	<pre style="margin-bottom: 0.2in; background: #e1e1e1">FROM python:3.11-slim AS builder<br/>
+# ... install deps<br/>
+FROM python:3.11-slim AS runtime<br/>
+# ... copy only what's needed</pre><blockquote>
+	📖 <a href="https://docs.docker.com/build/building/multi-stage/">Multi-stage
+	Dockerfiles</a><br/>
+📖 <a href="https://testdriven.io/blog/docker-best-practices/">Docker
+	best practices for Python</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>docker-compose.prod.yml</b></font>:</p>
+	<ul>
+		<li><p>☐ Services: <font face="Liberation Mono, monospace">api</font>,
+		<font face="Liberation Mono, monospace">db</font> (postgres),
+		<font face="Liberation Mono, monospace">redis</font>, <font face="Liberation Mono, monospace">nginx</font></p></li>
+		<li><p>☐ Nginx as reverse proxy for API + static frontend build</p></li>
+		<li><p>☐ Read secrets from <font face="Liberation Mono, monospace">.env.prod</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.nginx.com/resources/wiki/start/topics/examples/full/">Nginx
+	as reverse proxy — Docker guide</a><br/>
+📖 <a href="https://docs.docker.com/compose/use-secrets/">Docker
+	secrets / env management</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build React production bundle</b>: <font face="Liberation Mono, monospace">npm
+	run build</font> → <font face="Liberation Mono, monospace">dist/</font></p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Deploy to cloud</b>:</p>
+	<ul>
+		<li><p>☐ API + Postgres → <a href="https://railway.app/">Railway</a>
+		or <a href="https://render.com/docs/deploy-fastapi">Render</a></p></li>
+		<li><p>☐ Frontend → <a href="https://vercel.com/docs/frameworks/vite">Vercel</a>
+		(<font face="Liberation Mono, monospace">vercel --prod</font>)</p></li>
+		<li><p>☐ Set environment variables in each platform's dashboard</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://render.com/docs/deploy-fastapi">Deploy
+	FastAPI on Render</a><br/>
+📖 <a href="https://docs.railway.app/guides/dockerfiles">Railway
+	— deploy Docker services</a><br/>
+📖 <a href="https://vercel.com/docs/frameworks/vite">Vercel
+	— deploy Vite app</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Verify live URLs</b> — test every endpoint on production</p></li>
+</ul>
+<hr/>
+
+<h3 class="western">Afternoon — Hours 7–12: Documentation &amp;
+Portfolio</h3>
+<ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>README.md</b></font>
+	— the most important file in your repo:</p>
+	<ul>
+		<li><p>☐ Project overview + problem statement</p></li>
+		<li><p>☐ Architecture diagram (embed the roadmap image or draw
+		with Mermaid)</p></li>
+		<li><p>☐ Setup instructions (Docker Compose, env variables)</p></li>
+		<li><p>☐ API reference (link to <font face="Liberation Mono, monospace">/docs</font>)</p></li>
+		<li><p>☐ Live demo link</p></li>
+		<li><p>☐ Badges: <font face="Liberation Mono, monospace">![CI](...)</font>,
+		<font face="Liberation Mono, monospace">![Coverage](...)</font>,
+		<font face="Liberation Mono, monospace">![License](...)</font></p></li>
+	</ul>
+	<blockquote>📖 <a href="https://www.makeareadme.com/">Making a
+	great README</a><br/>
+📖 <a href="https://shields.io/">Shields.io
+	— readme badges</a><br/>
+📖 <a href="https://mermaid.js.org/syntax/architecture.html">Mermaid
+	architecture diagrams in markdown</a></blockquote></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>docs/data_dictionary.md</b></font>
+	— document every column in <font face="Liberation Mono, monospace">cleaned_listings</font></p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Write </b><font face="Liberation Mono, monospace"><b>docs/deployment_guide.md</b></font>
+	— step-by-step from clone to live</p></li>
+	<li><p>☐ 
+	</p>
+	<p><b>Build 10-slide presentation deck</b> (PowerPoint or Google
+	Slides):</p>
+	<ul>
+		<li><p>Problem: why Kenyans overpay for cars</p></li>
+		<li><p>Solution overview: what KenJapAI does</p></li>
+		<li><p>Data: sources, volume, methodology</p></li>
+		<li><p>EDA insights: top 3 findings</p></li>
+		<li><p>Import cost breakdown: formula walkthrough</p></li>
+		<li><p>ML model: features, algorithm, results (R², RMSE)</p></li>
+		<li><p>SHAP: what actually drives price</p></li>
+		<li><p>Product demo: screenshot tour</p></li>
+		<li><p>Savings analysis: how much can buyers save?</p></li>
+		<li><p>Next steps: roadmap, mobile app, dealer partnerships</p></li>
+	</ul>
+	<li><p>☐ 
+	</p>
+	<p><b>Polish GitHub repo</b>:</p>
+	<ul>
+		<li><p>☐ Clean commit history (squash any &quot;fix typo&quot;
+		commits)</p></li>
+		<li><p>☐ Add <font face="Liberation Mono, monospace">LICENSE</font>
+		file (MIT)</p></li>
+		<li><p>☐ Record a 60-second demo GIF with <a href="https://www.cockos.com/licecap/">LiceCap</a>
+		or <a href="https://getkap.co/">Kap</a></p></li>
+		<li><p>☐ Pin repo to your GitHub profile</p></li>
+		<li><p>☐ Draft LinkedIn post: project summary + demo GIF + live
+		link</p></li>
+	</ul>
+	<blockquote>📖 <a href="https://git-scm.com/book/en/v2/Git-Tools-Rewriting-History">git
+	rebase --interactive for squashing</a><br/>
+📖 <a href="https://choosealicense.com/">Choosing
+	an open source license</a></blockquote></li>
+</ul>
+<hr/>
+
+<h3 class="western">✅ Day 7 Deliverables</h3>
+<ul>
+	<li><p>☐ Live deployed platform (API + frontend URLs working)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">docker-compose.prod.yml</font>
+	+ Nginx config</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">README.md</font>
+	(complete, with badges + demo link)</p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">docs/data_dictionary.md</font></p></li>
+	<li><p>☐ <font face="Liberation Mono, monospace">docs/deployment_guide.md</font></p></li>
+	<li><p>☐ 10-slide presentation deck</p></li>
+	<li><p>☐ Portfolio-ready GitHub repo (clean, pinned, demo GIF)</p></li>
+</ul>
+<hr/>
+
+<hr/>
+
+<h2 class="western">Master Deliverables Checklist</h2>
+<table width="100%" cellpadding="4" cellspacing="0">
+	<col width="64*"/>
+	<col width="64*"/>
+	<col width="64*"/>
+	<col width="64*"/>
+	<thead>
+		<tr valign="top">
+			<th width="25%" style="border-top: 1px solid #000000; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				#</p>
+			</th>
+			<th width="25%" style="border-top: 1px solid #000000; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Deliverable</p>
+			</th>
+			<th width="25%" style="border-top: 1px solid #000000; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0.04in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day</p>
+			</th>
+			<th width="25%" style="border: 1px solid #000000; padding: 0.04in"><p align="left">
+				Status</p>
+			</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				1</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Raw scraper codebase (5 spiders)</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 1</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				2</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Docker Compose stack</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 1</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				3</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				ETL pipeline + Airflow DAG</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 2</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				4</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Cleaned dataset (CSV + Parquet)</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 2</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				5</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				EDA notebooks (2)</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 3</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				6</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				KRA import cost formula + local market data</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 3</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				7</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Trained ML model (R² ≥ 0.82) + MLflow log</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 4</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				8</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				FastAPI backend (5 endpoints, tested)</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 5</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				9</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				React frontend (5 pages)</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 6</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				10</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Live deployed platform</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 7</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				11</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Full project documentation</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 7</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+		<tr valign="top">
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				12</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				10-slide presentation deck</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: none; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0in"><p align="left">
+				Day 7</p>
+			</td>
+			<td width="25%" style="border-top: none; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-right: 1px solid #000000; padding-top: 0in; padding-bottom: 0.04in; padding-left: 0.04in; padding-right: 0.04in"><p>
+				<font face="Liberation Mono, monospace">[ ]</font></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+<p><br/>
+<br/>
+
+</p>
+<hr/>
+
+<p><i>Built with Python · PostgreSQL · Airflow · scikit-learn ·
+XGBoost · MLflow · SHAP · FastAPI · React · Docker</i></p>
+<p><br/>
+<br/>
+
+</p>
+</body>
+</html>
