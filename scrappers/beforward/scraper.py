@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""
-Scrape a single BE FORWARD vehicle detail page and extract all key information.
-
-Usage:
-    python scrape_beforward_car.py <url> [--output OUTPUT_FILE]
-
-Example:
-    python scrape_beforward_car.py https://www.beforward.jp/toyota/regiusace-van/cc260209/id/14289814/ --output car.json
-"""
 import requests
 import json
 import logging
@@ -18,6 +8,9 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
+# ─────────────────────────────────────────────────────────────
+# CONSTANTS
+# ─────────────────────────────────────────────────────────────
 BASE_URL   = "https://www.beforward.jp"
 START_URL  = "https://www.beforward.jp/stocklist/sar=steering/steering=Right/tp_country_id=27"
 OUTPUT_DIR = Path("data/raw/beforward")
@@ -69,7 +62,7 @@ def setup_logger(name: str) -> logging.Logger:
 # FETCH
 # ─────────────────────────────────────────────────────────────
 
-def fetch(url: str, logger: logging.Logger):
+def fetch(url: str, logger: logging.Logger) -> BeautifulSoup:
     logger.debug(f"GET {url}")
     resp = requests.get(url, headers=HEADERS, timeout=15)
     resp.raise_for_status()
@@ -77,24 +70,28 @@ def fetch(url: str, logger: logging.Logger):
 
 
 # ─────────────────────────────────────────────────────────────
-# PAGINATION
-# BE FORWARD uses path-based pagination:
-# /stocklist/page=2/sar=steering/steering=Right/tp_country_id=27
-# The last page number is shown in the pagination list (up to 4000)
+# JSON OUTPUT — shared helper
 # ─────────────────────────────────────────────────────────────
 
-def get_total_pages(soup, logger: logging.Logger) -> int:
-    """
-    Extracts the highest page number from the pagination list.
-    BE FORWARD pagination structure:
-      <li><a href="/stocklist/page=4000/...">4000</a></li>
-    """
+def save_json(path: Path, data: dict, logger: logging.Logger) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    logger.info(f"Saved → {path}")
+
+
+# ═════════════════════════════════════════════════════════════
+# PART 1 — STOCKLIST SCRAPER
+# Collects all individual vehicle URLs from paginated listing
+# and saves them to: data/raw/beforward/vehicle_urls_<ts>.json
+# ═════════════════════════════════════════════════════════════
+
+def get_total_pages(soup: BeautifulSoup, logger: logging.Logger) -> int:
     pages = [1]
-    for li in soup.select("div.results-pagination ul li a"):
-        text = li.get_text(strip=True)
+    for a in soup.select("div.results-pagination ul li a"):
+        text = a.get_text(strip=True)
         if text.isdigit():
             pages.append(int(text))
-
     total = max(pages)
     logger.info(f"Total pages detected: {total:,}")
     return total
@@ -102,44 +99,30 @@ def get_total_pages(soup, logger: logging.Logger) -> int:
 
 def build_page_url(base_url: str, page: int) -> str:
     """
-    BE FORWARD uses path segments instead of query params.
-    Page 1: /stocklist/sar=steering/steering=Right/tp_country_id=27
-    Page 2: /stocklist/page=2/sar=steering/steering=Right/tp_country_id=27
+    BE FORWARD uses path-segment pagination:
+    Page 1: /stocklist/sar=steering/...
+    Page 2: /stocklist/page=2/sar=steering/...
     """
     if page == 1:
         return base_url
-
-    # Insert page=N after /stocklist/
     return base_url.replace("/stocklist/", f"/stocklist/page={page}/", 1)
 
 
-# ─────────────────────────────────────────────────────────────
-# URL EXTRACTION
-# Vehicle links appear in two places per card:
-# 1. <a href="/toyota/sienta/bw726274/id/9989384/"> (photo col)
-# 2. <a class="vehicle-url-link" href="..."> (multiple per card)
-# We use vehicle-url-link and deduplicate.
-# ─────────────────────────────────────────────────────────────
-
-def extract_vehicle_urls(soup, logger: logging.Logger) -> list:
+def extract_vehicle_urls(soup: BeautifulSoup, logger: logging.Logger) -> list:
     """
-    Extracts all unique vehicle detail URLs from a single listing page.
-    Skips sold vehicles, banner rows, and non-vehicle links.
+    Extracts unique vehicle URLs from one listing page.
+    Skips SOLD items, banner rows and non-vehicle anchors.
     """
     urls = []
     seen = set()
 
     for row in soup.select("tr.stocklist-row"):
-        # Skip banner/login rows — they have no photo-col
         if not row.select_one("td.photo-col"):
             continue
-
-        # Skip SOLD listings — we only want available cars
         if row.select_one("div.price-col-sold"):
             logger.debug("Skipping SOLD listing")
             continue
 
-        # Get the first vehicle-url-link in this row (all links point to same car)
         link = row.select_one("a.vehicle-url-link")
         if not link:
             continue
@@ -148,7 +131,6 @@ def extract_vehicle_urls(soup, logger: logging.Logger) -> list:
         if not href or href in seen:
             continue
 
-        # Only keep paths matching /make/model/ref/id/ pattern
         if re.match(r"^/[^/]+/[^/]+/[^/]+/id/\d+/$", href):
             full_url = urljoin(BASE_URL, href)
             urls.append(full_url)
@@ -158,50 +140,19 @@ def extract_vehicle_urls(soup, logger: logging.Logger) -> list:
     return urls
 
 
-# ─────────────────────────────────────────────────────────────
-# JSON OUTPUT
-# ─────────────────────────────────────────────────────────────
-
-def save_to_json(urls: list, logger: logging.Logger) -> Path:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path  = OUTPUT_DIR / f"vehicle_urls_{timestamp}.json"
-
-    payload = {
-        "source":     START_URL,
-        "scraped_at": datetime.now().isoformat(),
-        "total":      len(urls),
-        "urls":       urls,
-    }
-
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-
-    logger.info(f"Saved {len(urls):,} URLs → {out_path}")
-    return out_path
-
-
-# ─────────────────────────────────────────────────────────────
-# MAIN SCRAPER
-# ─────────────────────────────────────────────────────────────
-
-def scrape_vehicle_urls(max_pages: int = None) -> list:
+def scrape_vehicle_urls(logger: logging.Logger, max_pages: int = None) -> list:
     """
-    Scrapes all pages and returns a list of vehicle detail URLs.
-
-    Args:
-        max_pages: optional cap e.g. max_pages=10 for testing.
-                   Pass None to scrape all pages (up to 4000).
+    Phase 1 — scrapes the stocklist and returns a list of vehicle URLs.
+    Also saves them immediately to:
+        data/raw/beforward/vehicle_urls_<timestamp>.json
     """
-    logger    = setup_logger("beforward_urls")
-    all_urls  = []
+    all_urls = []
 
     logger.info("=" * 60)
-    logger.info("BE FORWARD vehicle URL scraper started")
+    logger.info("PHASE 1 — Collecting vehicle URLs")
     logger.info(f"Source: {START_URL}")
     logger.info("=" * 60)
 
-    # Fetch page 1 to detect total pages
     try:
         soup = fetch(START_URL, logger)
     except requests.RequestException as e:
@@ -209,15 +160,14 @@ def scrape_vehicle_urls(max_pages: int = None) -> list:
         return all_urls
 
     total_pages = get_total_pages(soup, logger)
-
     if max_pages:
         total_pages = min(total_pages, max_pages)
         logger.info(f"Capped at {max_pages} pages")
 
-    # Parse page 1
+    # Page 1 — already fetched
     page_urls = extract_vehicle_urls(soup, logger)
     all_urls.extend(page_urls)
-    logger.info(f"Page 1/{total_pages} → {len(page_urls)} URLs | Total: {len(all_urls):,}")
+    logger.info(f"Page 1/{total_pages} → {len(page_urls)} | Total: {len(all_urls):,}")
 
     # Pages 2..N
     for page in range(2, total_pages + 1):
@@ -227,11 +177,11 @@ def scrape_vehicle_urls(max_pages: int = None) -> list:
             page_urls = extract_vehicle_urls(soup, logger)
 
             if not page_urls:
-                logger.warning(f"Page {page} returned no URLs — stopping early")
+                logger.warning(f"Page {page}: no URLs found — stopping early")
                 break
 
             all_urls.extend(page_urls)
-            logger.info(f"Page {page}/{total_pages} → {len(page_urls)} URLs | Total: {len(all_urls):,}")
+            logger.info(f"Page {page}/{total_pages} → {len(page_urls)} | Total: {len(all_urls):,}")
 
         except requests.RequestException as e:
             logger.error(f"Page {page} failed: {e}")
@@ -239,280 +189,248 @@ def scrape_vehicle_urls(max_pages: int = None) -> list:
 
         time.sleep(1.5)
 
-    # Save to JSON
-    save_to_json(all_urls, logger)
+    # Save URL list immediately after collection
+    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
+    url_path   = OUTPUT_DIR / f"vehicle_urls_{timestamp}.json"
+    save_json(url_path, {
+        "source":     START_URL,
+        "scraped_at": datetime.now().isoformat(),
+        "total":      len(all_urls),
+        "urls":       all_urls,
+    }, logger)
 
-    logger.info("=" * 60)
-    logger.info(f"Done. Total vehicle URLs collected: {len(all_urls):,}")
-    logger.info("=" * 60)
-
+    logger.info(f"Phase 1 complete — {len(all_urls):,} URLs collected")
     return all_urls
 
 
-if __name__ == "__main__":
-    # Test run — first 5 pages only
-    # Remove max_pages to scrape all 4000 pages
-    urls = scrape_vehicle_urls(max_pages=5)
+# ═════════════════════════════════════════════════════════════
+# PART 2 — DETAIL PAGE SCRAPER
+# Visits each URL and extracts full car data
+# Saves all results to: data/raw/beforward/cars_<timestamp>.json
+# ═════════════════════════════════════════════════════════════
 
-    print(f"\nTotal: {len(urls)} URLs")
-    for url in urls[:5]:
-        print(url)
-        
-import argparse
-import json
-import re
-import sys
-from typing import Optional, Dict, Any
+def parse_title_and_ref(soup: BeautifulSoup) -> dict:
+    title_tag  = soup.select_one("div.car-info-flex-box h1")
+    title      = title_tag.get_text(strip=True) if title_tag else "N/A"
 
-import requests
-from bs4 import BeautifulSoup
+    ref_tag    = soup.select_one("div.detail-specs-text")
+    ref_text   = ref_tag.get_text(strip=True) if ref_tag else ""
+    parts      = ref_text.split()
+    model_code = parts[0] if len(parts) > 0 else "N/A"
+    ref_no     = parts[1] if len(parts) > 1 else "N/A"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-}
+    return {"title": title, "model_code": model_code, "ref_no": ref_no}
 
-def fetch_soup(url: str) -> Optional[BeautifulSoup]:
-    """Fetch the URL and return a BeautifulSoup object."""
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-        return BeautifulSoup(resp.text, "html.parser")
-    except Exception as e:
-        print(f"Error fetching {url}: {e}", file=sys.stderr)
-        return None
 
-def clean_text(text: Optional[str]) -> str:
-    """Strip and normalise whitespace."""
-    if not text:
-        return ""
-    return re.sub(r"\s+", " ", text).strip()
+def parse_pricing(soup: BeautifulSoup) -> dict:
+    price_tag     = soup.select_one("span.price.ip-usd-price")
+    total_tag     = soup.select_one("span#fn-vehicle-price-total-price")
+    orig_tag      = soup.select_one("p.original-vehicle-price")
+    save_tag      = soup.select_one("p#fn-current-save-rate")
+    port_tag      = soup.select_one("p.destination-port")
+    quote_tag     = soup.select_one("span#fn-vehicle-price-quote-type")
 
-def extract_from_spec_table(soup: BeautifulSoup, label: str) -> str:
+    return {
+        "currency":         "$",
+        "vehicle_price":    price_tag.get_text(strip=True) if price_tag else "N/A",
+        "total_price":      total_tag.get_text(strip=True) if total_tag else "N/A",
+        "original_price":   orig_tag.get_text(strip=True) if orig_tag else "N/A",
+        "discount_rate":    save_tag.get_text(strip=True) if save_tag else "N/A",
+        "destination_port": port_tag.get_text(separator=" ", strip=True) if port_tag else "N/A",
+        "quote_type":       quote_tag.get_text(strip=True) if quote_tag else "N/A",
+    }
+
+
+def parse_specs_table(soup: BeautifulSoup) -> dict:
     """
-    Extract a value from the specification table (class="specification").
-    Looks for a <th> containing the label and returns the next <td> text.
+    Parses the full specification table (table.specification).
+    Each row has th/td pairs — flattened to a dict.
     """
-    # Find the th that exactly or partially matches the label (case‑insensitive)
-    th = soup.find("th", string=re.compile(re.escape(label), re.IGNORECASE))
-    if not th:
-        # Try finding any th with the label in its text
-        th = soup.find("th", string=lambda s: s and label.lower() in s.lower())
-    if th:
-        td = th.find_next_sibling("td")
-        if td:
-            return clean_text(td.get_text())
-    return ""
+    specs = {}
+    table = soup.select_one("table.specification")
+    if not table:
+        return specs
 
-def extract_from_pickup_table(soup: BeautifulSoup, label: str) -> str:
-    """
-    Extract a value from the pickup specification table (class="pickup-specification").
-    The table has rows of 5 columns; we find the <td> that follows the label.
-    """
-    pickup_table = soup.find("div", class_="pickup-specification")
-    if not pickup_table:
-        return ""
-    # The labels are in <td class="specs-pickup-text">
-    for row in pickup_table.find_all("tr"):
-        labels = row.find_all("td", class_="specs-pickup-text")
-        values = row.find_all("td", class_="pickup-specification-text")
-        for i, lbl in enumerate(labels):
-            if label.lower() in clean_text(lbl.get_text()).lower():
-                if i < len(values):
-                    return clean_text(values[i].get_text())
-    return ""
+    for row in table.select("tr"):
+        cells = row.find_all(["th", "td"])
+        for i in range(0, len(cells) - 1, 2):
+            label = cells[i].get_text(separator=" ", strip=True).lower()
+            value = cells[i + 1].get_text(separator=" ", strip=True) if i + 1 < len(cells) else ""
+            label = re.sub(r"\s+", "_", label).strip("_")
+            if label and value:
+                specs[label] = value
 
-def extract_features(soup: BeautifulSoup):
-    """
-    Extract the features list from the .remarks section.
-    Returns a dict with keys "available" and "not_available".
-    """
+    return specs
+
+
+def parse_pickup_specs(soup: BeautifulSoup) -> dict:
+    """Quick 5-column specs row: Mileage, Year, Engine, Trans, Fuel."""
+    specs = {}
+    table = soup.select_one("div.pickup-specification table")
+    if not table:
+        return specs
+
+    rows = table.select("tr")
+    if len(rows) < 2:
+        return specs
+
+    headers = [td.get_text(strip=True).lower() for td in rows[0].select("td")]
+    values  = [td.get_text(separator=" ", strip=True) for td in rows[1].select("td")]
+
+    for h, v in zip(headers, values):
+        specs[re.sub(r"\s+", "_", h)] = v
+
+    return specs
+
+
+def parse_location(soup: BeautifulSoup) -> dict:
+    tag = soup.select_one("span.specs-pickup-icon b")
+    return {"location": tag.get_text(strip=True) if tag else "N/A"}
+
+
+def parse_features(soup: BeautifulSoup):
     features = []
-    remarks = soup.find("div", class_="remarks")
-    if not remarks:
-        return features
-
-    for li in remarks.find_all("li"):
-        text = clean_text(li.get_text())
-        if not text:
-            continue
-        if "attached_on" in li.get("class", []):
+    for li in soup.select("div.remarks li"):
+        text    = li.get_text(strip=True)
+        classes = li.get("class", [])
+        if "attached_on" in classes:
             features.append(text)
-        else:
-            # fallback: if no class, assume available? We'll skip.
-            pass
     return features
 
-def scrape_car_page(url: str) -> Dict[str, Any]:
-    """
-    Extract all required car information from the BE FORWARD detail page.
-    """
-    soup = fetch_soup(url)
-    if not soup:
-        return {}
 
-    data: Dict[str, Any] = {}
+def parse_images(soup: BeautifulSoup) -> list:
+    """Reads all image paths from hidden <input class='fn-images-pc'> elements."""
+    images, seen = [], set()
+    for inp in soup.select("input.fn-images-pc"):
+        path = inp.get("data-path", "")
+        if path and path not in seen:
+            images.append(("https:" + path) if path.startswith("//") else path)
+            seen.add(path)
+    return images
 
-    # ----- Basic info (from title and right panel) -----
-    # Title: h1 contains make and model (e.g., "2012 TOYOTA REGIUSACE VAN WIDE SUPER GL")
-    h1 = soup.find("h1")
-    if h1:
-        full_title = clean_text(h1.get_text())
-        data["title"] = full_title
-        # Try to extract year, make, model from title
-        # Example: "2012 TOYOTA REGIUSACE VAN WIDE SUPER GL"
-        parts = full_title.split()
-        if parts and parts[0].isdigit():
-            data["year"] = parts[0]
-            if len(parts) > 1:
-                data["make"] = parts[1]
-                # The rest is model + grade
-                data["model"] = " ".join(parts[2:]) if len(parts) > 2 else ""
-        else:
-            data["year"] = ""
-            data["make"] = ""
-            data["model"] = ""
 
-    # Stock ID (Ref. No.)
-    data["stock_id"] = extract_from_spec_table(soup, "Ref. No.")
+def parse_total_image_count(soup: BeautifulSoup) -> int:
+    tag = soup.select_one("span#fn-slider-total")
+    try:
+        return int(tag.get_text(strip=True)) if tag else 0
+    except ValueError:
+        return 0
 
-    # Model code
-    data["model_code"] = extract_from_spec_table(soup, "Model Code")
 
-    # Mileage
-    mileage_raw = extract_from_spec_table(soup, "Mileage")
-    data["mileage"] = mileage_raw
+def parse_detail_page(soup: BeautifulSoup, car_url: str, logger: logging.Logger) -> dict:
+    """Master parser — merges all section parsers into one flat dict."""
+    title_ref   = parse_title_and_ref(soup)
+    pricing     = parse_pricing(soup)
+    location    = parse_location(soup)
+    pickup      = parse_pickup_specs(soup)
+    specs       = parse_specs_table(soup)
+    features    = parse_features(soup)
+    images      = parse_images(soup)
+    image_count = parse_total_image_count(soup)
 
-    # Engine (Engine Size)
-    data["engine"] = extract_from_spec_table(soup, "Engine Size")
-
-    # Transmission – from pickup table or spec table
-    trans = extract_from_pickup_table(soup, "Trans.") or extract_from_spec_table(soup, "Transmission")
-    data["transmission"] = trans
-
-    # Drive type
-    data["drive_type"] = extract_from_spec_table(soup, "Drive")
-
-    # Steering
-    data["steering"] = extract_from_spec_table(soup, "Steering")
-
-    # Fuel type
-    data["fuel_type"] = extract_from_spec_table(soup, "Fuel")
-
-    # Doors
-    data["doors"] = extract_from_spec_table(soup, "Doors")
-
-    # Seats
-    data["seats"] = extract_from_spec_table(soup, "Seats")
-
-    # Color (Ext. Color)
-    data["color"] = extract_from_spec_table(soup, "Ext. Color")
-
-    # Location
-    data["location"] = extract_from_spec_table(soup, "Location")
-
-    # Grade / Version
-    data["grade"] = extract_from_spec_table(soup, "Version/Class")
-
-    # Body type – not explicitly present in the given snippet, but we can try to find a row with "Body Type"
-    data["body_type"] = extract_from_spec_table(soup, "Body Type")
-    if not data["body_type"]:
-        # Fallback: maybe from the "About this vehicle" paragraph? Leave empty.
-        data["body_type"] = ""
-
-    # Registration year/month
-    reg = extract_from_spec_table(soup, "Registration Year/month")
-    if reg and "/" in reg:
-        parts = reg.split("/")
-        data["year"] = data.get("year", parts[0].strip())
-        data["month"] = parts[1].strip() if len(parts) > 1 else ""
-    else:
-        data["month"] = ""
-
-    # Manufacture year/month (optional, but we can store)
-    data["manufacture_year_month"] = extract_from_spec_table(soup, "Manufacture Year/month")
-
-    # ----- Pricing and currency -----
-    # Vehicle price
-    price_elem = soup.select_one(".vehicle-price .price")
-    if price_elem:
-        price_text = clean_text(price_elem.get_text())
-        # Extract currency symbol and numeric value
-        match = re.match(r"([\$€£¥])([\d,]+)", price_text)
-        if match:
-            data["currency"] = match.group(1)
-            data["vehicle_price"] = match.group(2)
-        else:
-            data["currency"] = ""
-            data["vehicle_price"] = price_text
-    else:
-        data["currency"] = ""
-        data["vehicle_price"] = ""
-
-    # Total price (CIF or Total Price)
-    total_elem = soup.select_one("#fn-vehicle-price-total-price")
-    if total_elem:
-        total_val = clean_text(total_elem.get_text())
-        data["total_price"] = total_val
-    else:
-        # fallback: find .total-price .price or similar
-        total_alt = soup.select_one(".total-price .price")
-        if total_alt:
-            data["total_price"] = clean_text(total_alt.get_text())
-        else:
-            data["total_price"] = ""
-
-    # ----- Vehicle Details (Make, Model, Body color, Body Type, Doors, Seats) -----
-    # Some of these we already have, but we can fill missing from other tables
-    data["vehicle_details"] = {
-        "Make": data.get("make", ""),
-        "Model": data.get("model", ""),
-        "Body color": data.get("color", ""),
-        "Body Type": data.get("body_type", ""),
-        "Doors": data.get("doors", ""),
-        "Seats": data.get("seats", ""),
+    car = {
+        "car_url":     car_url,
+        "scraped_at":  datetime.now().isoformat(),
+        "source":      "beforward",
+        **title_ref,
+        **pricing,
+        **location,
+        **pickup,
+        **specs,
+        "features": features,
+        "image_count": image_count,
+        "images":      images,
     }
 
-    # ----- Specifications (Dimension, M3, Weight, Gross Weight, Max Loading) -----
-    data["specifications"] = {
-        "Dimension": extract_from_spec_table(soup, "Dimension"),
-        "M3": extract_from_spec_table(soup, "M3"),
-        "Vehicle Weight": extract_from_spec_table(soup, "Weight"),
-        "Gross Vehicle Weight": extract_from_spec_table(soup, "Gross Vehicle Weight"),
-        "Max Loading Capacity": extract_from_spec_table(soup, "Max.Cap"),
-    }
+    logger.info(
+        f"Parsed: {title_ref.get('title', '?')} | "
+        f"Ref: {title_ref.get('ref_no', '?')} | "
+        f"Price: {pricing.get('vehicle_price', '?')} | "
+        f"Images: {image_count}"
+    )
+    return car
 
-    # ----- Features list (available / not available) -----
-    data["features"] = extract_features(soup)
 
-    # Additional useful info: image count (optional)
-    total_images = soup.select_one("#fn-slider-total")
-    if total_images:
-        data["image_count"] = clean_text(total_images.get_text())
-    else:
-        data["image_count"] = ""
+def scrape_details(urls: list, logger: logging.Logger) -> list:
+    """
+    Phase 2 — visits each vehicle URL, parses the detail page,
+    and returns a list of car dicts.
+    Also saves all cars to:
+        data/raw/beforward/cars_<timestamp>.json
+    """
+    all_cars = []
 
-    return data
+    logger.info("=" * 60)
+    logger.info(f"PHASE 2 — Scraping {len(urls):,} detail pages")
+    logger.info("=" * 60)
 
-def main():
-    parser = argparse.ArgumentParser(description="Scrape a BE FORWARD car detail page")
-    parser.add_argument("url", help="Vehicle URL (e.g., https://www.beforward.jp/toyota/regiusace-van/cc260209/id/14289814/)")
-    parser.add_argument("--output", "-o", default="car_data.json", help="Output JSON file name")
-    args = parser.parse_args()
+    for i, url in enumerate(urls, 1):
+        try:
+            soup = fetch(url, logger)
+            car  = parse_detail_page(soup, url, logger)
+            all_cars.append(car)
+            logger.info(f"[{i}/{len(urls)}] Done: {car.get('ref_no', '?')}")
+        except requests.RequestException as e:
+            logger.error(f"[{i}/{len(urls)}] Failed {url}: {e}")
+            all_cars.append({"car_url": url, "error": str(e), "scraped_at": datetime.now().isoformat()})
 
-    data = scrape_car_page(args.url)
-    if not data:
-        print("Failed to extract data. Exiting.", file=sys.stderr)
-        sys.exit(1)
+        time.sleep(1.5)
 
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    # Save full car dataset
+    timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
+    cars_path  = OUTPUT_DIR / f"cars_{timestamp}.json"
+    save_json(cars_path, {
+        "source":     START_URL,
+        "scraped_at": datetime.now().isoformat(),
+        "total":      len(all_cars),
+        "cars":       all_cars,
+    }, logger)
 
-    print(f"✅ Saved extracted data to {args.output}")
-    # Print a quick summary
-    print(f"Stock ID: {data.get('stock_id')}")
-    print(f"Title: {data.get('title')}")
-    print(f"Price: {data.get('currency')}{data.get('vehicle_price')}  |  Total: {data.get('total_price')}")
+    logger.info(f"Phase 2 complete — {len(all_cars):,} cars scraped")
+    return all_cars
+
+
+# ═════════════════════════════════════════════════════════════
+# PIPELINE — wires both phases together
+# ═════════════════════════════════════════════════════════════
+
+def run(max_pages: int = None):
+    """
+    Full pipeline:
+      Phase 1 → collect all vehicle URLs  → saves vehicle_urls_<ts>.json
+      Phase 2 → scrape each detail page   → saves cars_<ts>.json
+
+    Args:
+        max_pages: cap on listing pages scraped (None = all pages).
+                   e.g. max_pages=5 scrapes ~125 cars for testing.
+    """
+    logger = setup_logger("beforward")
+
+    logger.info("▶ BE FORWARD full pipeline started")
+
+    # Phase 1 — collect URLs
+    urls = scrape_vehicle_urls(logger, max_pages=max_pages)
+
+    if not urls:
+        logger.error("No URLs collected — aborting Phase 2")
+        return
+
+    # Phase 2 — scrape details
+    cars = scrape_details(urls, logger)
+
+    logger.info("=" * 60)
+    logger.info(f"Pipeline complete")
+    logger.info(f"  URLs collected : {len(urls):,}")
+    logger.info(f"  Cars scraped   : {len(cars):,}")
+    logger.info(f"  Output dir     : {OUTPUT_DIR.resolve()}")
+    logger.info("=" * 60)
+
+
+# ─────────────────────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    main()
+    # Test: scrape first 2 listing pages (~50 cars)
+    # Remove max_pages to scrape everything
+    run(max_pages=1)
