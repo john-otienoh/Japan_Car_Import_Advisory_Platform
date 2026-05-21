@@ -343,4 +343,3 @@ with open(out_file.with_suffix(".csv"), "w") as f:
 ---
 
 **Happy scraping – and remember to always be a good citizen of the web!**
-```

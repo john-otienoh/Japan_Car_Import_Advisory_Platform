@@ -1,7 +1,7 @@
-Homepage  - ("https://www.sbtjapan.com/")
-Search All Car listing Page - ("https://www.sbtjapan.com/used-cars/search")
-return individual_url_list.json
-Scrape an individual car link from the  all car listing page - ("https://www.sbtjapan.com/used-cars/AI7736")
+Homepage  - ("https://www.sbtjapan.com/")<br>
+Search All Car listing Page - ("https://www.sbtjapan.com/used-cars/search")<br>
+return individual_url_list.json<br>
+Scrape an individual car link from the  all car listing page - ("https://www.sbtjapan.com/used-cars/AI7736")<br>
 
 Scrape the individual car listng page for all car information
 **Car Information**
