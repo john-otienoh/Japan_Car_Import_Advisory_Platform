@@ -1,0 +1,114 @@
+version: "3.9"
+
+networks:
+  autoimport-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mlflow_data:
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: autoimport-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: autoimport
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - autoimport-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d autoimport"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prefect:
+    build: ./pipelines
+    container_name: autoimport-prefect
+    restart: unless-stopped
+    environment:
+      # Prefect server configuration
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://admin:password@postgres:5432/autoimport
+      PREFECT_API_HOST: 0.0.0.0
+      PREFECT_API_PORT: 4200
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_UI_API_URL: http://localhost:4200/api
+      # Optional: MLflow tracking URI (flows can log to MLflow)
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports:
+      - "4200:4200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    networks:
+      - autoimport-network
+    volumes:
+      # Mount flows & scrapers for live development (optional)
+      - ./pipelines/flows:/opt/prefect/flows
+      - ./pipelines/scrapers:/opt/prefect/scrapers
+    command: >
+      sh -c "prefect server start --host 0.0.0.0 --port 4200"
+
+  backend:
+    build: ./services/backend
+    container_name: autoimport-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres:5432/autoimport
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    networks:
+      - autoimport-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  dashboard:
+    build: ./services/dashboard
+    container_name: autoimport-ui
+    restart: unless-stopped
+    environment:
+      API_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    networks:
+      - autoimport-network
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    container_name: autoimport-mlflow
+    restart: unless-stopped
+    environment:
+      MLFLOW_BACKEND_URI: postgresql://admin:password@postgres:5432/autoimport
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - autoimport-network
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql://admin:password@postgres:5432/autoimport
+      --default-artifact-root /mlflow/artifacts

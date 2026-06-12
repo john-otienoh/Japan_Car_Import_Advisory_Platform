@@ -1,13 +1,13 @@
 ```markdown
-# Scraper Documentation
+# scrapper Documentation
 
-This guide covers three **Japanese car marketplace scrapers**:
+This guide covers three **Japanese car marketplace scrappers**:
 
 - **SBTJapan** – scrapes search results and individual car detail pages.
 - **Beforward** – scrapes the stocklist and detail pages.
-- **CarFromJapan** – two‑stage scraper (listing + detailed specs).
+- **CarFromJapan** – two‑stage scrapper (listing + detailed specs).
 
-All scrapers share a common base module (`scrappers/base.py`) that provides logging, HTTP fetching with retries, JSON saving, and project root detection.  
+All scrappers share a common base module (`scrappers/base.py`) that provides logging, HTTP fetching with retries, JSON saving, and project root detection.  
 **Now with CLI support** – you can control the number of listing pages directly from the command line.
 
 ---
@@ -35,7 +35,7 @@ source .\venv\Scripts\activate   # Windows
 pip install requests beautifulsoup4 lxml
 ```
 
-> **Note**: `lxml` is used by all scrapers for faster HTML parsing.
+> **Note**: `lxml` is used by all scrappers for faster HTML parsing.
 
 ### 4. Verify folder structure
 Your project should look like this:
@@ -48,23 +48,23 @@ scrappers/
 │
 ├── aaajapan/
 │   ├── __init__.py
-│   └── scraper.py               
+│   └── scrapper.py               
 │
 ├── beforward/
 │   ├── __init__.py
-│   └── scraper.py               
+│   └── scrapper.py               
 │
 ├── carfromjapan/
 │   ├── __init__.py
-│   └── scraper.py               
+│   └── scrapper.py               
 │
 ├── japanesecartrade/
 │   ├── __init__.py
-│   └── scraper.py               
+│   └── scrapper.py               
 │
 ├── sbtjapan/
 │   ├── __init__.py
-│   └── scraper.py               
+│   └── scrapper.py               
 │
 └── __pycache__/                 
 ```
@@ -73,38 +73,38 @@ scrappers/
 
 ## Common Configuration via CLI
 
-You can now **limit the number of listing pages** directly when running any scraper:
+You can now **limit the number of listing pages** directly when running any scrapper:
 
 ```bash
-python -m <site>.scraper --max-pages  N
+python -m <site>.scrapper --max-pages  N
 ```
 
 - `--max-pages N` – scrape only the first `N` listing pages (good for testing).
-- If **omitted**, the scraper will scrape **all available pages** (full run).
+- If **omitted**, the scrapper will scrape **all available pages** (full run).
 
 > **Note**: For CarFromJapan, the default value of `DEFAULT_MAX_PAGES` in the script is ignored when you use `--max-pages`. If you want a permanent limit, still edit the file.
 
 ---
 
-## SBTJapan Scraper
+## SBTJapan scrapper
 
 **Scrapes**:  
 - Paginated search results (e.g., all Honda Accord listings).  
 - Each car's detail page (price, specs, images, options, engagement stats).  
 - Saves **one JSON file** containing all scraped cars.
 
-### Run the scraper
+### Run the scrapper
 ```bash
 # Scrape all pages
-python -m sbtjapan.scraper
+python -m sbtjapan.scrapper
 
 # Scrape only first 5 pages
-python -m sbtjapan.scraper --max-pages 5
+python -m sbtjapan.scrapper --max-pages 5
 ```
 
 ### Customisation (optional – edit the file)
 
-You can still edit `scrappers/sbtjapan/scraper.py` to change the search URL or delay:
+You can still edit `scrappers/sbtjapan/scrapper.py` to change the search URL or delay:
 
 ```python
 BASE_SEARCH_URL = "https://www.sbtjapan.com/used-cars/search"
@@ -135,25 +135,25 @@ REQUEST_DELAY = 1.5
 
 ---
 
-## Beforward Scraper
+## Beforward scrapper
 
 **Scrapes**:  
 - Paginated stocklist (`/stocklist/...`).  
 - Each vehicle’s detail page (price, full specs table, features list, image gallery).  
 - Saves **one JSON file** with all vehicles.
 
-### Run the scraper
+### Run the scrapper
 ```bash
 # All pages
-python -m beforward.scraper
+python -m beforward.scrapper
 
 # Only first 3 pages
-python -m beforward.scraper --max-pages 3
+python -m beforward.scrapper --max-pages 3
 ```
 
 ### Customisation (optional)
 
-Edit `scrappers/beforward/scraper.py` to change the starting URL or delay:
+Edit `scrappers/beforward/scrapper.py` to change the starting URL or delay:
 
 ```python
 START_URL = "https://www.beforward.jp/stocklist/sar=steering/steering=Right/tp_country_id=27"
@@ -186,31 +186,31 @@ REQUEST_DELAY = 1.5
 
 ---
 
-## CarFromJapan Scraper
+## CarFromJapan scrapper
 
-**Two‑stage scraper**:
+**Two‑stage scrapper**:
 
 1. **Listing stage** – collects car cards from paginated `/kenya/cheap-used-cars-for-sale` (or any similar page).  
 2. **Detail stage** – visits each URL and extracts full specifications, accessories, all images, and exact prices.  
    Merges listing fields into the final record.
 
-### Run the scraper
+### Run the scrapper
 ```bash
 # Use default limit (4 pages if you haven't changed the file)
-python -m carfromjapan.scraper
+python -m carsfromjapan.scrapper
 
 # Override – scrape only 2 pages
-python -m carfromjapan.scraper --max-pages 2
+python -m carsfromjapan.scrapper --max-pages 2
 
 # Override – scrape all pages (if you want full run)
-python -m carfromjapan.scraper --max-pages 1000   # or a very high number
+python -m carsfromjapan.scrapper --max-pages 1000  # or a very high number
 ```
 
-> **Tip**: To make “no argument” mean **all pages**, set `DEFAULT_MAX_PAGES = None` at the top of `carfromjapan/scraper.py`. Otherwise, the built‑in default is `4`.
+> **Tip**: To make “no argument” mean **all pages**, set `DEFAULT_MAX_PAGES = None` at the top of `carfromjapan/scrapper.py`. Otherwise, the built‑in default is `4`.
 
 ### Customisation (optional)
 
-Edit `scrappers/carfromjapan/scraper.py` to change the search path or delay:
+Edit `scrappers/carfromjapan/scrapper.py` to change the search path or delay:
 
 ```python
 START_PATH = "/kenya/cheap-used-cars-for-sale"
@@ -258,13 +258,13 @@ Two files are saved:
 
 ### `ModuleNotFoundError: No module named 'scrappers'`
 - Run from the **project root** using the `-m` flag:  
-  `python -m sbtjapan.scraper`
+  `python -m sbtjapan.scrapper`
 - Or add the project root to `PYTHONPATH`:  
   `export PYTHONPATH=/path/to/Japan_Car_Import_Advisory_Platform`
 
 ### HTTP errors (403, 503)
 - The `fetch()` function already retries 3 times. Increase `REQUEST_DELAY` or use a VPN/proxy.
-- Some sites may require `cloudscraper` – you can replace `requests` in `base.py`.
+- Some sites may require `cloudscrapper` – you can replace `requests` in `base.py`.
 
 ### No data or empty JSON
 - Check the log file – it will show if the scraping was blocked or if HTML selectors changed.
@@ -277,7 +277,7 @@ Two files are saved:
 
 ## Performance & Ethics
 
-| Scraper | Average time per car | Memory usage |
+| scrapper | Average time per car | Memory usage |
 |---------|---------------------|---------------|
 | SBTJapan | ~1.5–2 seconds | ~50 MB |
 | Beforward | ~1.5–2 seconds | ~50 MB |
@@ -299,7 +299,7 @@ CarFromJapan saves intermediate listing JSON, so you can:
 2. Modify `scrape_details()` to accept a pre‑loaded dictionary.
 3. Restart from where it stopped.
 
-For the other scrapers, you would need to extend the code (e.g., by checking already scraped URLs).
+For the other scrappers, you would need to extend the code (e.g., by checking already scraped URLs).
 
 ---
 
@@ -308,7 +308,7 @@ For the other scrapers, you would need to extend the code (e.g., by checking alr
 You can test any detail page parser without running the full pipeline:
 
 ```python
-from sbtjapan.scraper import scrape_detail
+from sbtjapan.scrapper import scrape_detail
 from base import setup_logger
 
 logger = setup_logger("test")
@@ -322,7 +322,7 @@ Similarly for Beforward and CarFromJapan.
 
 ## Customising Output Format
 
-All scrapers use `save_to_json()` from `base.py`. If you prefer CSV or SQLite, modify the `run()` function to write to another format. Example for CSV:
+All scrappers use `save_to_json()` from `base.py`. If you prefer CSV or SQLite, modify the `run()` function to write to another format. Example for CSV:
 
 ```python
 import csv
@@ -337,7 +337,7 @@ with open(out_file.with_suffix(".csv"), "w") as f:
 ## Getting Help
 
 - Check the logs in `logs/` – they contain detailed DEBUG output.
-- For HTML selector changes, use browser developer tools to inspect the current page structure, then update the CSS selectors in the scraper.
+- For HTML selector changes, use browser developer tools to inspect the current page structure, then update the CSS selectors in the scrapper.
 - If you encounter bugs, please open an issue with the log file and the URL that caused the error.
 
 ---

@@ -29,6 +29,43 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
+FINAL_FIELDS = [
+    "source",
+    "car_url",
+    "title",
+    "model_code",
+    "ref_no",
+    "registration_year",
+    "manufacture_year",
+    "grade",
+    "transmission",
+    "mileage",
+    "engine_capacity",
+    "fuel_type",
+    "seats",
+    "doors",
+    "steering",
+    "drive_type",
+    "exterior_color",
+    "chassis_no",
+    "currency",
+    "vehicle_price",
+    "total_price",
+    "discount_rate",
+    "delivery_port",
+    "location",
+    "body_type",
+    "freight_amount",
+    "inspection_amount",
+    "insurance_amount",
+    "vehicle_price_breakdown",
+    "make",
+    "model",
+    "model_name",
+    "features",
+    "image_urls"
+]
+
 def my_logger(name, log_dir="logs"):
     """
     Create a logger with both console and file output.
