@@ -1,0 +1,1973 @@
+================================================================
+VEHICLE SCRAPING PIPELINE — Complete Refactored Codebase
+================================================================
+Sources  : SBT Japan · Cars From Japan · BeForward
+Schema   : Unified Vehicle dataclass (32 fields)
+Layers   : Bronze → Silver → Gold (Medallion Architecture)
+Output   : PostgreSQL-ready JSON + SQL schemas
+================================================================
+
+Each section starts with:  ===== FILE: path/to/file =====
+Create files at those paths relative to your project root.
+
+================================================================
+
+
+===== FILE: requirements.txt =====
+
+requests>=2.31.0
+beautifulsoup4>=4.12.3
+lxml>=5.1.0
+
+
+===== FILE: scrapers/__init__.py =====
+
+# scrapers package
+
+
+===== FILE: utils/__init__.py =====
+
+# utils package
+
+
+===== FILE: pipeline/__init__.py =====
+
+# pipeline package
+
+
+================================================================
+===== FILE: scrapers/base.py =====
+Shared utilities: fetch, logger, clean, save_to_json, slugify.
+Used by all three scrapers.
+================================================================
+
+#!/usr/bin/env python3
+"""
+base.py — Shared utilities for all scrapers.
+"""
+
+import json
+import logging
+import re
+import requests
+from datetime import datetime
+from pathlib import Path
+from bs4 import BeautifulSoup
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+
+def my_logger(name: str, log_dir: str = "logs") -> logging.Logger:
+    """File + console logger with timestamps."""
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_path / f"{name}_{timestamp}.log"
+
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    if logger.handlers:
+        logger.handlers.clear()
+
+    fmt = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(fmt)
+
+    fh = logging.FileHandler(log_file, encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fmt)
+
+    logger.addHandler(console)
+    logger.addHandler(fh)
+    logger.info(f"Logger ready → {log_file}")
+    return logger
+
+
+def fetch(url: str, logger: logging.Logger, retries: int = 3):
+    """GET a URL and return BeautifulSoup. Returns None if all retries fail."""
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    for attempt in range(1, retries + 1):
+        try:
+            r = session.get(url, timeout=30)
+            r.raise_for_status()
+            logger.debug(f"Fetched {url} [HTTP {r.status_code}]")
+            return BeautifulSoup(r.text, "lxml")
+        except requests.RequestException as e:
+            logger.warning("Attempt %d/%d for %s failed: %s", attempt, retries, url, e)
+    logger.error("All %d attempts failed for %s", retries, url)
+    return None
+
+
+def clean(text: str) -> str:
+    """Normalise whitespace in extracted text."""
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def save_to_json(data, path, logger: logging.Logger) -> None:
+    """Write Python dict/list to a JSON file (UTF-8, pretty-printed)."""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    count = len(data) if isinstance(data, (dict, list)) else "?"
+    logger.info(f"Saved {count} record(s) → {out}")
+
+
+def slugify(label: str) -> str:
+    """Convert a human label into a snake_case dict key."""
+    label = clean(label).lower()
+    label = re.sub(r"[^\w\s]", "", label)
+    label = re.sub(r"\s+", "_", label)
+    return label.strip("_")
+
+
+def get_project_root(marker: str = ".git") -> Path:
+    """Walk upwards until a marker file/dir is found."""
+    current = Path(__file__).resolve().parent
+    while current != current.parent:
+        if (current / marker).exists():
+            return current
+        current = current.parent
+    return Path(__file__).resolve().parents[1]
+
+
+================================================================
+===== FILE: utils/schema.py =====
+Unified Vehicle dataclass — the single source of truth.
+Every scraper outputs records that match this schema exactly.
+================================================================
+
+#!/usr/bin/env python3
+"""
+schema.py — Canonical Vehicle data model.
+"""
+
+from dataclasses import dataclass, field, asdict
+from typing import List
+
+# All keys a valid vehicle record must contain
+REQUIRED_KEYS: set = {
+    "source", "car_url", "stock_id", "chassis_no",
+    "title", "manufacturing_year", "make", "model_name", "model", "body_type",
+    "model_code", "grade", "mileage", "engine", "transmission", "drive",
+    "steering", "fuel", "doors", "seats", "exterior_color", "dimension",
+    "currency", "vehicle_price", "total_price", "freight_amount",
+    "inspection_amount", "insurance_amount", "destination_port", "location",
+    "features", "image_urls",
+}
+
+
+@dataclass
+class Vehicle:
+    # ── Identity ──────────────────────────────────────────────────────────────
+    source: str = ""            # sbtjapan | carsfromjapan | beforward
+    car_url: str = ""
+    stock_id: str = ""          # ref_no / reference_no / stock_id
+    chassis_no: str = ""        # VIN / chassis number
+
+    # ── Title & derived fields ────────────────────────────────────────────────
+    title: str = ""
+    manufacturing_year: str = ""
+    make: str = ""
+    model_name: str = ""        # e.g. Hiace, Harrier, RAV4
+    model: str = ""             # grade / trim / variant, e.g. DX, Premium
+    body_type: str = ""
+
+    # ── Vehicle details ───────────────────────────────────────────────────────
+    model_code: str = ""        # technical model code, e.g. 5BA-A200A
+    grade: str = ""             # raw grade string from scraper
+    mileage: str = ""
+    engine: str = ""
+    transmission: str = ""
+    drive: str = ""
+    steering: str = ""
+    fuel: str = ""
+    doors: str = ""
+    seats: str = ""
+    exterior_color: str = ""
+    dimension: str = ""
+
+    # ── Pricing & logistics ───────────────────────────────────────────────────
+    currency: str = ""
+    vehicle_price: str = ""
+    total_price: str = ""
+    freight_amount: str = ""
+    inspection_amount: str = ""
+    insurance_amount: str = ""
+    destination_port: str = ""
+    location: str = ""
+
+    # ── Collections ───────────────────────────────────────────────────────────
+    features: List[str] = field(default_factory=list)   # flat feature list
+    image_urls: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+================================================================
+===== FILE: utils/helpers.py =====
+Shared normalization helpers used during Vehicle construction.
+================================================================
+
+#!/usr/bin/env python3
+"""
+helpers.py — Value cleaning and normalization utilities.
+"""
+
+from typing import Union
+
+# Values treated as empty/missing
+EMPTY_PLACEHOLDERS = {"", "—", "-", "N/A", "n/a", "None", "null", "—kg", "-"}
+
+
+def is_empty(value: Union[str, None]) -> bool:
+    """Return True if value is None or a known empty placeholder."""
+    return value is None or str(value).strip() in EMPTY_PLACEHOLDERS
+
+
+def clean_value(value: str) -> str:
+    """Replace dash/N/A placeholders with empty string."""
+    return "" if is_empty(value) else str(value).strip()
+
+
+def flatten_options(options: dict) -> list:
+    """
+    Flatten a nested {category: [item, ...]} dict into a flat feature list.
+
+    Used for SBT Japan car_options and Cars From Japan accessories.
+
+    Example:
+        {"Safety": ["ABS", "Airbag"], "Comfort": ["A/C"]}
+        → ["ABS", "Airbag", "A/C"]
+    """
+    features = []
+    for items in (options or {}).values():
+        if isinstance(items, list):
+            features.extend(item.strip() for item in items if item.strip())
+    return features
+
+
+def normalize_transmission(value: str) -> str:
+    """Normalize to AT or MT."""
+    v = str(value).upper().strip().replace("/", "").replace(" ", "")
+    if v in ("AT", "AUTOMATIC", "AUTO", "A", "AT"):
+        return "AT"
+    if v in ("MT", "MANUAL", "M", "MT"):
+        return "MT"
+    return value
+
+
+def normalize_drive(value: str) -> str:
+    """Normalize to 2WD or 4WD."""
+    v = str(value).upper().replace(" ", "")
+    if any(x in v for x in ("4WD", "4X4", "AWD", "ALLWHEEL")):
+        return "4WD"
+    if any(x in v for x in ("2WD", "4X2", "FWD", "RWD")):
+        return "2WD"
+    return value
+
+
+def normalize_steering(value: str) -> str:
+    """Normalize to RHD or LHD."""
+    v = str(value).upper()
+    if "RIGHT" in v or "RHD" in v:
+        return "RHD"
+    if "LEFT" in v or "LHD" in v:
+        return "LHD"
+    return value
+
+
+def normalize_fuel(value: str) -> str:
+    """Normalize fuel type to a consistent label."""
+    v = str(value).upper()
+    if any(x in v for x in ("PETROL", "GASOLINE", "GAS")):
+        return "Petrol"
+    if "DIESEL" in v:
+        return "Diesel"
+    if "HYBRID" in v:
+        return "Hybrid"
+    if any(x in v for x in ("ELECTRIC", "EV", "BEV")):
+        return "Electric"
+    return value.title()
+
+
+================================================================
+===== FILE: utils/title_parser.py =====
+Extract make, manufacturing_year, model_name, model, body_type
+from raw car listing titles.
+
+Retention rule: only fills EMPTY fields on the Vehicle object.
+Existing scraped values are NEVER overwritten.
+================================================================
+
+#!/usr/bin/env python3
+"""
+title_parser.py — Parse structured fields out of raw listing titles.
+
+Example:
+    "2020 TOYOTA HIACE VAN DX"
+    → manufacturing_year="2020", make="Toyota",
+      model_name="Hiace", model="Dx", body_type="Van"
+"""
+
+import re
+
+# ── Make reference list ───────────────────────────────────────────────────────
+# Multi-word makes MUST appear before single-word makes (longest-first).
+MAKES: list = [
+    # Multi-word
+    "Land Rover", "Rolls Royce", "Harley Davidson", "Nissan Diesel",
+    "John Deere", "Austin Rover", "Sky Jack", "Tata Motors", "Toyo Tyres",
+    "NipponSharyo", "Mitsui Seiki", "Furukawa Unic", "Kobashi Kogyo",
+    "Mz Speed",
+    # Single-word (alphabetical within group)
+    "Abarth", "Aimgain", "Alfaromeo", "AMG", "Aprilia", "Audi",
+    "Bentley", "Birkin", "BMW", "Bomag", "Bridgestone", "Buggati", "Buick",
+    "Cadillac", "Caterpillar", "Chevrolet", "Chrysler", "Citroen",
+    "DAF", "Daihatsu", "Daimler", "Datsun", "Daewoo", "Denyo", "Dodge", "Ducati",
+    "Ferrari", "Fiat", "Foden", "Ford",
+    "Geely", "GM",
+    "Hanix", "Hino", "Hitachi", "Honda", "Hummer",
+    "IHI", "Iseki", "Isuzu", "Iwafuji",
+    "Jaguar", "JCB", "Jeep",
+    "Kato", "Kawasaki", "KIA", "Kobelco", "Komatsu", "Kubota",
+    "Lamborghini", "Lancia", "Lexus", "Lincoln",
+    "Maserati", "Maybach", "Mercedes", "Mercury", "MF", "Michelin",
+    "Meiwa", "MG", "Mini", "Mitsubishi", "Mitsuoka", "Morooka",
+    "Mazda",
+    "Nichiyu", "Nissan",
+    "Opel",
+    "Peugeot", "Porsche",
+    "Renault",
+    "Saab", "Sakai", "Scania", "Skoda", "Smart", "Ssangyong", "Subaru",
+    "Sumitomo", "Suzuki",
+    "Tadano", "TCM", "Tesla", "TOA", "Toyota", "Triumph", "TVR",
+    "Vauxhall", "Volkswagen", "Volvo",
+    "Yamaha", "Yanmar", "Yokohama",
+]
+
+# ── Body type reference list ──────────────────────────────────────────────────
+# Multi-word types MUST appear before single-word types (longest-first).
+BODY_TYPES: list = [
+    # Multi-word (longest first)
+    "Station Wagon", "Mini Van", "Pick Up", "Smart Cab",
+    "Heavy Equipment", "Sports Cars", "Sedan Cars", "Pickup Trucks",
+    "Dump Truck", "Flatbody Truck", "Box Body Truck", "Freezer Truck",
+    "Crane Truck", "Wingbody Truck", "Tanker Truck", "Trailer Head",
+    "Double Cabin", "Garbage Truck", "Vaccum Truck", "Concrete Pump",
+    "Self Loader", "Car Carrier", "Fire Fighting", "Mixer Truck",
+    "Cargo Truck", "Drilling Truck", "All Machinery", "Wheel Loader",
+    "Heavy Cranes", "Aerial Platform", "Motor Grader", "Air Compressor",
+    "Stone Crusher", "Asphalt Finisher", "Farm Machinery", "Other Machinery",
+    "Camper Van", "Mini Truck", "Large Bus", "Mini Bus",
+    # Single-word
+    "Sedan", "Coupe", "Hatchback", "Wagon", "SUV", "Convertible",
+    "Bus", "Truck", "Van", "Excavator", "Bulldozer", "Roller", "Crawler",
+    "Generator", "Forklifts", "Tractors", "Bicycle", "Bikes", "Boats",
+    "Parts", "Jeep", "MUV",
+]
+
+# Regex patterns
+_YEAR_RE = re.compile(r"\b(19[7-9]\d|20[0-3]\d)(?:/\d{1,2})?\b")
+_MODEL_CODE_RE = re.compile(r"\b[A-Z0-9]{2,5}-[A-Z0-9]{3,10}\b")
+
+
+def parse_title(title: str) -> dict:
+    """
+    Parse a raw listing title into structured vehicle fields.
+
+    Parameters
+    ----------
+    title : str
+        Raw title string, e.g. "2020 TOYOTA HIACE VAN DX"
+
+    Returns
+    -------
+    dict
+        Keys: manufacturing_year, make, model_name, model, body_type
+        Values are str or "" (never None).
+
+    Notes
+    -----
+    Parsing order:
+        1. Extract year  (handle YYYY/MM format → keep YYYY)
+        2. Strip embedded model codes (e.g. 6AA-AXAH54, 5BA-A200A)
+        3. Extract make  (longest match wins; only first occurrence removed)
+        4. Extract body type  (longest match wins)
+        5. Remaining tokens → model_name (first) + model (rest)
+    """
+    result = {
+        "manufacturing_year": "",
+        "make": "",
+        "model_name": "",
+        "model": "",
+        "body_type": "",
+    }
+
+    if not isinstance(title, str) or not title.strip():
+        return result
+
+    working = title.strip().upper()
+
+    # 1. Extract manufacturing year
+    m = _YEAR_RE.search(working)
+    if m:
+        result["manufacturing_year"] = m.group().split("/")[0]
+        working = (working[: m.start()] + working[m.end() :]).strip()
+
+    # 2. Remove embedded model codes (before make matching to avoid false hits)
+    working = _MODEL_CODE_RE.sub("", working).strip()
+
+    # 3. Extract make (greedy longest-match; first occurrence only)
+    for make in MAKES:
+        pattern = r"\b" + re.escape(make.upper()) + r"\b"
+        if re.search(pattern, working):
+            result["make"] = make.title()
+            working = re.sub(pattern, "", working, count=1).strip()
+            break
+
+    # 4. Extract body type (greedy longest-match)
+    for bt in BODY_TYPES:
+        pattern = r"\b" + re.escape(bt.upper()) + r"\b"
+        if re.search(pattern, working):
+            result["body_type"] = bt.title()
+            working = re.sub(pattern, "", working, count=1).strip()
+            break
+
+    # 5. Remaining tokens → model_name + model
+    tokens = working.split()
+    if tokens:
+        result["model_name"] = tokens[0].title()
+    if len(tokens) > 1:
+        result["model"] = " ".join(tokens[1:]).title()
+
+    return result
+
+
+def enrich_vehicle(vehicle) -> object:
+    """
+    Apply title-parsed fields to a Vehicle object.
+
+    Retention rule
+    --------------
+    Only fields that are currently empty ("", None, "—", "N/A") are filled
+    from the title parser.  Existing scraped values are NEVER overwritten.
+
+    Parameters
+    ----------
+    vehicle : Vehicle
+        A Vehicle dataclass instance (import from utils.schema).
+
+    Returns
+    -------
+    Vehicle
+        Same object, mutated in place and returned.
+    """
+    from utils.helpers import is_empty
+
+    parsed = parse_title(vehicle.title)
+
+    for field_name, parsed_value in parsed.items():
+        current = getattr(vehicle, field_name, "")
+        if is_empty(current) and parsed_value:
+            setattr(vehicle, field_name, parsed_value)
+
+    return vehicle
+
+
+================================================================
+===== FILE: scrapers/sbtjapan.py =====
+SBT Japan scraper — refactored to output unified Vehicle schema.
+CSS selectors preserved from original. Deprecated fields removed.
+car_options replaced with flat features list.
+================================================================
+
+#!/usr/bin/env python3
+"""
+sbtjapan.py — Scrape SBT Japan and emit unified Vehicle records.
+
+Pipeline:
+    get_listing_urls()  →  scrape_vehicle()  →  parse_vehicle()  →  save_json()
+"""
+
+import time
+from urllib.parse import urljoin
+
+from scrapers.base import my_logger, fetch, clean, save_to_json, get_project_root, slugify
+from utils.schema import Vehicle
+from utils.helpers import clean_value
+from utils.title_parser import enrich_vehicle
+
+SOURCE = "sbtjapan"
+BASE_URL = "https://www.sbtjapan.com"
+BASE_SEARCH_URL = f"{BASE_URL}/used-cars/search"
+PROJECT_ROOT = get_project_root()
+OUTPUT_DIR = PROJECT_ROOT / "bronze"
+LOG_DIR = PROJECT_ROOT / "logs" / SOURCE
+REQUEST_DELAY = 1.5
+
+
+# ── Listing page ──────────────────────────────────────────────────────────────
+
+def _get_total_pages(soup) -> int:
+    pages = [
+        int(a.get_text(strip=True))
+        for a in soup.select("a.pagination__link")
+        if a.get_text(strip=True).isdigit()
+    ]
+    return max(pages) if pages else 1
+
+
+def get_listing_urls(search_url: str, logger, max_pages=None) -> list:
+    """Collect all vehicle detail URLs from paginated search results."""
+    urls = []
+
+    logger.info(f"Page 1: {search_url}")
+    soup = fetch(search_url, logger=logger)
+    if soup is None:
+        return urls
+
+    total = _get_total_pages(soup)
+    if max_pages:
+        total = min(total, max_pages)
+    logger.info(f"Total pages: {total}")
+
+    for a in soup.select("a.card-product__wrap"):
+        if href := a.get("href", ""):
+            urls.append(urljoin(BASE_URL, href))
+
+    for page in range(2, total + 1):
+        soup = fetch(f"{search_url}?page={page}", logger=logger)
+        if soup is None:
+            logger.error(f"Page {page} failed — stopping.")
+            break
+        for a in soup.select("a.card-product__wrap"):
+            if href := a.get("href", ""):
+                urls.append(urljoin(BASE_URL, href))
+        logger.info(f"Page {page}/{total} | URLs: {len(urls)}")
+        time.sleep(REQUEST_DELAY)
+
+    logger.info(f"Found {len(urls)} URLs")
+    return urls
+
+
+# ── Detail page section parsers ───────────────────────────────────────────────
+
+def _parse_header(soup) -> dict:
+    """Title, model_code, manufacturing_year, body_type from page header."""
+    name_tag = soup.select_one("h1.product-detail__name")
+    items = [clean(el.get_text()) for el in soup.select("div.product-detail__detail-item")]
+    return {
+        "title": clean(name_tag.get_text()) if name_tag else "",
+        "model_code": items[0] if len(items) > 0 else "",
+        "manufacturing_year": items[1] if len(items) > 1 else "",
+        "body_type": items[2] if len(items) > 2 else "",
+    }
+
+
+def _parse_identification(soup) -> dict:
+    """Stock ID and inventory location."""
+    stock_tag = soup.select_one("span.product-detail__id-number")
+    location_tag = soup.select_one("div.product-detail__location-country")
+    return {
+        "stock_id": clean(stock_tag.get_text()) if stock_tag else "",
+        "location": clean(location_tag.get_text()) if location_tag else "",
+    }
+
+
+def _parse_pricing(soup) -> dict:
+    """Vehicle price, total, and cost breakdown."""
+    def _get(el_id: str) -> str:
+        el = soup.select_one(f"div#{el_id}")
+        return clean(el.get_text()) if el else ""
+
+    base_price = soup.select_one("span.product-detail__base-price-range")
+    base_curr = soup.select_one("span.product-detail__base-price-currency")
+    total_tag = soup.select_one("div#total_amount")
+    return {
+        "currency": clean(base_curr.get_text()) if base_curr else "USD",
+        "vehicle_price": clean(base_price.get_text()) if base_price else "",
+        "total_price": clean(total_tag.get_text()) if total_tag else "",
+        "freight_amount": _get("freight_amount"),
+        "inspection_amount": _get("inspection_amount"),
+        "insurance_amount": _get("insurance_amount"),
+    }
+
+
+def _parse_specs(soup) -> dict:
+    """Specification items (mileage, engine, transmission, etc.)."""
+    specs = {}
+    for item in soup.select("div.product-detail__status-item"):
+        label_el = item.select_one("div.product-detail__status-label")
+        value_el = item.select_one("div.product-detail__status-value")
+        if label_el and value_el:
+            key = slugify(clean(label_el.get_text()))
+            key = "doors" if key == "door" else key
+            specs[key] = clean(value_el.get_text())
+    return specs
+
+
+def _parse_modal_fields(soup) -> dict:
+    """
+    Hidden form fields from price-estimate modal.
+    Provides: make, model_name, grade, body_type, manufacturing_year.
+    """
+    field_map = {
+        "make": "make",
+        "name": "model_name",
+        "grade": "grade",
+        "body_type": "body_type",
+        "year": "manufacturing_year",
+    }
+    result = {}
+    for input_name, key in field_map.items():
+        inp = soup.select_one(f'form#get_estimate_id input[name="{input_name}"]')
+        if inp:
+            result[key] = inp.get("value", "").strip()
+    return result
+
+
+def _parse_features(soup) -> list:
+    """Available car options as a flat feature list (replaces car_options)."""
+    return [
+        clean(el.get_text())
+        for block in soup.select("div.product-detail__option-block")
+        for el in block.select("div.product-detail__option-item.-available")
+        if clean(el.get_text())
+    ]
+
+
+def _parse_images(soup) -> list:
+    """Full-size gallery image URLs."""
+    urls = []
+    gallery = soup.select_one("div.product-detail__gallery-slider")
+    if gallery:
+        for slide in gallery.select("div.swiper-slide"):
+            img = slide.select_one("div.product-detail__main-image img")
+            if img and img.get("src"):
+                urls.append(img["src"])
+    return urls
+
+
+# ── Vehicle builder ───────────────────────────────────────────────────────────
+
+def parse_vehicle(soup, car_url: str) -> Vehicle:
+    """Merge all section parsers and return a unified Vehicle."""
+    header = _parse_header(soup)
+    ident = _parse_identification(soup)
+    pricing = _parse_pricing(soup)
+    specs = _parse_specs(soup)
+    modal = _parse_modal_fields(soup)
+
+    # modal fields take priority over header for year/body_type
+    mfg_year = modal.get("manufacturing_year") or header.get("manufacturing_year", "")
+    body_type = modal.get("body_type") or header.get("body_type", "")
+
+    v = Vehicle(
+        source=SOURCE,
+        car_url=car_url,
+        stock_id=ident.get("stock_id", ""),
+        chassis_no="",
+        title=header.get("title", ""),
+        manufacturing_year=mfg_year,
+        make=modal.get("make", "").title(),
+        model_name=modal.get("model_name", "").title(),
+        model=modal.get("grade", ""),           # grade = trim level (e.g. "G", "DX")
+        body_type=body_type.title(),
+        model_code=clean_value(header.get("model_code", "")),
+        grade=modal.get("grade", ""),
+        mileage=specs.get("mileage", ""),
+        engine=specs.get("engine", ""),
+        transmission=specs.get("transmission", ""),
+        drive=specs.get("drive", ""),
+        steering=specs.get("steering", ""),
+        fuel=specs.get("fuel", ""),
+        doors=specs.get("doors", ""),
+        seats=specs.get("seats", ""),
+        exterior_color=specs.get("body_color", "").title(),
+        dimension=specs.get("dimension", ""),
+        currency=pricing.get("currency", "USD"),
+        vehicle_price=pricing.get("vehicle_price", ""),
+        total_price=pricing.get("total_price", ""),
+        freight_amount=pricing.get("freight_amount", ""),
+        inspection_amount=pricing.get("inspection_amount", ""),
+        insurance_amount=pricing.get("insurance_amount", ""),
+        destination_port="",
+        location=ident.get("location", ""),
+        features=_parse_features(soup),
+        image_urls=_parse_images(soup),
+    )
+    # Fill any empty fields by parsing the title
+    return enrich_vehicle(v)
+
+
+def scrape_vehicle(url: str, logger) -> Vehicle | None:
+    soup = fetch(url, logger=logger)
+    if soup is None:
+        logger.error(f"Failed: {url}")
+        return None
+    return parse_vehicle(soup, url)
+
+
+# ── Pipeline ──────────────────────────────────────────────────────────────────
+
+def run(search_url: str = BASE_SEARCH_URL, max_pages: int = None) -> None:
+    logger = my_logger(SOURCE, log_dir=LOG_DIR)
+    logger.info("Starting scrape...")
+
+    urls = get_listing_urls(search_url, logger, max_pages)
+    if not urls:
+        logger.error("No URLs found.")
+        return
+
+    vehicles = []
+    total = len(urls)
+    for idx, url in enumerate(urls, 1):
+        logger.info(f"\nVehicle {idx}/{total}")
+        v = scrape_vehicle(url, logger)
+        if v:
+            vehicles.append(v.to_dict())
+            logger.info(f"  ✓ Saved — {v.make} {v.model_name}")
+        else:
+            logger.info(f"  ✗ Skipped — {url}")
+        time.sleep(REQUEST_DELAY)
+
+    save_to_json(vehicles, OUTPUT_DIR / f"{SOURCE}.json", logger)
+    logger.info(f"\nFinished\n{len(vehicles)} vehicles saved")
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-pages", type=int, default=None)
+    args = ap.parse_args()
+    run(max_pages=args.max_pages)
+
+
+================================================================
+===== FILE: scrapers/carsfromjapan.py =====
+Cars From Japan scraper — refactored to unified Vehicle schema.
+Simplified to List → Detail (no intermediate listing card data).
+accessories replaced with flat features list.
+================================================================
+
+#!/usr/bin/env python3
+"""
+carsfromjapan.py — Scrape Cars From Japan and emit unified Vehicle records.
+
+Pipeline:
+    get_listing_urls()  →  scrape_vehicle()  →  parse_vehicle()  →  save_json()
+"""
+
+import time
+import re
+
+from scrapers.base import my_logger, fetch, clean, save_to_json, get_project_root, slugify
+from utils.schema import Vehicle
+from utils.helpers import clean_value
+from utils.title_parser import enrich_vehicle
+
+SOURCE = "carsfromjapan"
+BASE_URL = "https://carfromjapan.com"
+START_PATH = "/kenya/cheap-used-cars-for-sale"
+PROJECT_ROOT = get_project_root()
+OUTPUT_DIR = PROJECT_ROOT / "bronze"
+LOG_DIR = PROJECT_ROOT / "logs" / SOURCE
+REQUEST_DELAY = 1.5
+DEFAULT_MAX_PAGES = 10
+
+# Map verbose spec labels → Vehicle field names
+SPEC_KEY_MAP = {
+    "Reference No.":       "reference_no",
+    "Model Code":          "model_code",
+    "Model Grade":         "grade",
+    "Manufacture Year":    "manufacturing_year",
+    "Transmission":        "transmission",
+    "Mileage":             "mileage",
+    "Engine Capacity":     "engine",
+    "Fuel Type":           "fuel",
+    "No. of Seats":        "seats",
+    "No. of Doors":        "doors",
+    "Steering":            "steering",
+    "Drive Type":          "drive",
+    "Dimension":           "dimension",
+    "VIN / Chassis No.":   "chassis_no",
+    "Exterior Color":      "exterior_color",
+}
+
+THUMB_SUFFIX = "_100_100"
+FULL_SUFFIX = "_640_0"
+EXCLUDE_IMAGE_PATTERNS = ["banner-payment", "thumb-banner", "/public/next-desktop/"]
+
+
+def _listing_url(page: int) -> str:
+    base = f"{BASE_URL}{START_PATH}"
+    return f"{base}?page={page}" if page > 1 else base
+
+
+# ── Listing page ──────────────────────────────────────────────────────────────
+
+def get_listing_urls(logger, max_pages: int = DEFAULT_MAX_PAGES) -> list:
+    """Collect vehicle detail URLs from paginated listing pages."""
+    urls, consecutive_empty = [], 0
+
+    for page in range(1, max_pages + 1):
+        if page > 1:
+            time.sleep(REQUEST_DELAY)
+
+        url = _listing_url(page)
+        logger.info(f"Page {page}")
+        soup = fetch(url, logger=logger)
+
+        if soup is None:
+            consecutive_empty += 1
+            if consecutive_empty >= 3:
+                logger.error("3 consecutive failures — stopping")
+                break
+            continue
+
+        page_urls = []
+        for card in soup.select('[data-testid="car-item-list"]'):
+            tag = card.select_one("h3 a")
+            if tag:
+                href = tag.get("href", "")
+                full = BASE_URL + href if href.startswith("/") else href
+                if full and full not in urls:
+                    page_urls.append(full)
+
+        urls.extend(page_urls)
+        found = len(page_urls)
+        logger.info(f"Found {found} vehicles")
+        consecutive_empty = 0 if found else consecutive_empty + 1
+
+        if consecutive_empty >= 3:
+            logger.error("3 consecutive empty pages — stopping")
+            break
+
+    logger.info(f"Total: {len(urls)} URLs")
+    return urls
+
+
+# ── Detail page section parsers ───────────────────────────────────────────────
+
+def _extract_title(soup) -> str:
+    h1 = soup.find("h1")
+    if h1:
+        return clean(h1.get_text())
+    tag = soup.find("title")
+    return clean(tag.get_text()).split("|")[0].strip() if tag else ""
+
+
+def _extract_specs(soup) -> dict:
+    """Parse the specification table using SPEC_KEY_MAP."""
+    specs = {}
+    table = soup.select_one("div.border-t-primary table, table.w-full.table-fixed")
+    if not table:
+        return specs
+    for row in table.select("tbody tr"):
+        cells = row.find_all("td", recursive=False)
+        for i in range(0, len(cells) - 1, 2):
+            raw_label = clean(cells[i].get_text())
+            raw_value = clean(cells[i + 1].get_text())
+            if not raw_label or raw_value in ("", "-"):
+                continue
+            key = SPEC_KEY_MAP.get(raw_label, slugify(raw_label))
+            specs[key] = raw_value
+    return specs
+
+
+def _extract_prices(soup) -> dict:
+    prices = {}
+    els = soup.select(".car-price")
+    if els:
+        prices["vehicle_price"] = clean(els[0].get_text())
+    for el in els:
+        if "font-bold" in (el.get("class") or []):
+            prices["total_price"] = clean(el.get_text())
+            break
+    return prices
+
+
+def _extract_destination(soup) -> str:
+    heading = soup.find("h2", string=re.compile(r"Delivery", re.I))
+    if heading:
+        port_el = heading.find_next("p")
+        if port_el:
+            return clean(port_el.get_text())
+    return ""
+
+
+def _extract_features(soup) -> list:
+    """Flatten accessories into a single feature list."""
+    features = []
+    heading = soup.find("h2", string=re.compile(r"Accessories", re.I))
+    if not heading:
+        return features
+    wrapper = heading.find_parent("div", class_=lambda c: c and "w-full" in c)
+    if not wrapper:
+        return features
+    for section in wrapper.select("div.pt-4\\.5"):
+        for span in section.select("span.text-\\[13px\\]"):
+            text = clean(span.get_text())
+            if text:
+                features.append(text)
+    return features
+
+
+def _extract_images(soup) -> list:
+    """Full-size image URLs from the thumbnail navigation."""
+    urls, seen = [], set()
+    for img in soup.select('nav[aria-label="Thumbnail Navigation"] button img'):
+        src = img.get("src", "")
+        if src.startswith("//"):
+            src = "https:" + src
+        if src.endswith(THUMB_SUFFIX):
+            src = src[: -len(THUMB_SUFFIX)] + FULL_SUFFIX
+        if src and not any(p in src for p in EXCLUDE_IMAGE_PATTERNS) and src not in seen:
+            urls.append(src)
+            seen.add(src)
+    return urls
+
+
+# ── Vehicle builder ───────────────────────────────────────────────────────────
+
+def parse_vehicle(soup, car_url: str) -> Vehicle:
+    specs = _extract_specs(soup)
+    prices = _extract_prices(soup)
+
+    v = Vehicle(
+        source=SOURCE,
+        car_url=car_url,
+        stock_id=specs.pop("reference_no", ""),
+        chassis_no=specs.pop("chassis_no", ""),
+        title=_extract_title(soup),
+        manufacturing_year=specs.pop("manufacturing_year", ""),
+        make="",            # derived from title (not on CFJ listing page)
+        model_name="",      # derived from title
+        model=specs.pop("grade", ""),
+        body_type="",       # derived from title
+        model_code=clean_value(specs.pop("model_code", "")),
+        grade=specs.get("grade", ""),
+        mileage=specs.pop("mileage", ""),
+        engine=specs.pop("engine", ""),
+        transmission=specs.pop("transmission", ""),
+        drive=specs.pop("drive", ""),
+        steering=specs.pop("steering", ""),
+        fuel=specs.pop("fuel", ""),
+        doors=specs.pop("doors", ""),
+        seats=specs.pop("seats", ""),
+        exterior_color=specs.pop("exterior_color", "").title(),
+        dimension=specs.pop("dimension", ""),
+        currency="USD",
+        vehicle_price=prices.get("vehicle_price", ""),
+        total_price=prices.get("total_price", ""),
+        freight_amount="",
+        inspection_amount="",
+        insurance_amount="",
+        destination_port=_extract_destination(soup),
+        location="Japan",
+        features=_extract_features(soup),
+        image_urls=_extract_images(soup),
+    )
+    return enrich_vehicle(v)
+
+
+def scrape_vehicle(url: str, logger) -> Vehicle | None:
+    soup = fetch(url, logger=logger)
+    if soup is None:
+        logger.error(f"Failed: {url}")
+        return None
+    return parse_vehicle(soup, url)
+
+
+# ── Pipeline ──────────────────────────────────────────────────────────────────
+
+def run(max_pages: int = DEFAULT_MAX_PAGES) -> None:
+    logger = my_logger(SOURCE, log_dir=LOG_DIR)
+    logger.info("Starting scrape...")
+
+    urls = get_listing_urls(logger, max_pages)
+    if not urls:
+        logger.error("No URLs found.")
+        return
+
+    vehicles = []
+    total = len(urls)
+    for idx, url in enumerate(urls, 1):
+        logger.info(f"\nVehicle {idx}/{total}")
+        v = scrape_vehicle(url, logger)
+        if v:
+            vehicles.append(v.to_dict())
+            logger.info(f"  ✓ Saved — {v.make} {v.model_name}")
+        else:
+            logger.info(f"  ✗ Skipped — {url}")
+        time.sleep(REQUEST_DELAY)
+
+    save_to_json(vehicles, OUTPUT_DIR / f"{SOURCE}.json", logger)
+    logger.info(f"\nFinished\n{len(vehicles)} vehicles saved")
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES)
+    args = ap.parse_args()
+    run(max_pages=args.max_pages)
+
+
+================================================================
+===== FILE: scrapers/beforward.py =====
+BeForward scraper — refactored to unified Vehicle schema.
+features list preserved (already flat). Deprecated fields removed.
+================================================================
+
+#!/usr/bin/env python3
+"""
+beforward.py — Scrape BeForward and emit unified Vehicle records.
+
+Pipeline:
+    get_listing_urls()  →  scrape_vehicle()  →  parse_vehicle()  →  save_json()
+"""
+
+import time
+import re
+from urllib.parse import urljoin
+
+from scrapers.base import my_logger, fetch, clean, save_to_json, get_project_root, slugify
+from utils.schema import Vehicle
+from utils.helpers import clean_value
+from utils.title_parser import enrich_vehicle
+
+SOURCE = "beforward"
+BASE_URL = "https://www.beforward.jp"
+START_URL = (
+    "https://www.beforward.jp/stocklist/sar=steering/steering=Right/tp_country_id=27"
+)
+PROJECT_ROOT = get_project_root()
+OUTPUT_DIR = PROJECT_ROOT / "bronze"
+LOG_DIR = PROJECT_ROOT / "logs" / SOURCE
+REQUEST_DELAY = 1.5
+
+
+# ── Listing page ──────────────────────────────────────────────────────────────
+
+def _get_total_pages(soup, logger) -> int:
+    pages = [1]
+    for a in soup.select("div.results-pagination ul li a"):
+        text = a.get_text(strip=True)
+        if text.isdigit():
+            pages.append(int(text))
+    total = max(pages)
+    logger.info(f"Total pages: {total:,}")
+    return total
+
+
+def _build_page_url(base_url: str, page: int) -> str:
+    """BeForward uses path-segment pagination: /stocklist/page=N/sar=..."""
+    if page == 1:
+        return base_url
+    return base_url.replace("/stocklist/", f"/stocklist/page={page}/", 1)
+
+
+def _extract_page_urls(soup) -> list:
+    urls = []
+    for row in soup.select("tr.stocklist-row"):
+        if row.select_one("div.price-col-sold"):
+            continue                        # skip sold vehicles
+        link = row.select_one("a.vehicle-url-link")
+        if link:
+            href = link.get("href", "").strip()
+            if href and re.match(r"^/[^/]+/[^/]+/[^/]+/id/\d+/$", href):
+                urls.append(urljoin(BASE_URL, href))
+    return urls
+
+
+def get_listing_urls(logger, max_pages=None) -> list:
+    """Collect vehicle detail URLs from paginated stocklist."""
+    all_urls = []
+
+    soup = fetch(START_URL, logger=logger)
+    if soup is None:
+        return all_urls
+
+    total = _get_total_pages(soup, logger)
+    if max_pages:
+        total = min(total, max_pages)
+
+    page_urls = _extract_page_urls(soup)
+    all_urls.extend(page_urls)
+    logger.info(f"Page 1/{total} → {len(page_urls)} | Total: {len(all_urls)}")
+
+    for page in range(2, total + 1):
+        soup = fetch(_build_page_url(START_URL, page), logger=logger)
+        if soup is None:
+            logger.error(f"Page {page} failed — stopping.")
+            break
+        page_urls = _extract_page_urls(soup)
+        if not page_urls:
+            logger.warning(f"Page {page}: no URLs — stopping.")
+            break
+        all_urls.extend(page_urls)
+        logger.info(f"Page {page}/{total} → {len(page_urls)} | Total: {len(all_urls)}")
+        time.sleep(REQUEST_DELAY)
+
+    logger.info(f"Found {len(all_urls)} URLs")
+    return all_urls
+
+
+# ── Detail page section parsers ───────────────────────────────────────────────
+
+def _parse_title_and_ref(soup) -> dict:
+    """Title, model_code, and reference number."""
+    title_tag = soup.select_one("div.car-info-flex-box h1")
+    title = clean(title_tag.get_text()) if title_tag else ""
+    ref_tag = soup.select_one("div.detail-specs-text")
+    parts = clean(ref_tag.get_text()).split() if ref_tag else []
+    return {
+        "title": title,
+        "model_code": parts[0] if parts else "",
+        "stock_id": parts[1] if len(parts) > 1 else "",
+    }
+
+
+def _parse_pricing(soup) -> dict:
+    price = soup.select_one("span.price.ip-usd-price")
+    total = soup.select_one("span#fn-vehicle-price-total-price")
+    port = soup.select_one("p.destination-port")
+    return {
+        "currency": "$",
+        "vehicle_price": clean(price.get_text()) if price else "",
+        "total_price": clean(total.get_text()) if total else "",
+        "destination_port": clean(port.get_text(separator=" ")) if port else "",
+    }
+
+
+def _parse_specs(soup) -> dict:
+    """Full specification table — dynamic slug keys."""
+    specs = {}
+    table = soup.select_one("table.specification")
+    if not table:
+        return specs
+    for row in table.select("tr"):
+        cells = row.find_all(["th", "td"])
+        for i in range(0, len(cells) - 1, 2):
+            label = slugify(clean(cells[i].get_text(separator=" ")))
+            value = clean(cells[i + 1].get_text()) if i + 1 < len(cells) else ""
+            if label and value:
+                specs[label] = value
+    return specs
+
+
+def _parse_pickup_specs(soup) -> dict:
+    """Pickup specification block (year, registration, etc.)."""
+    specs = {}
+    table = soup.select_one("div.pickup-specification table")
+    if not table:
+        return specs
+    rows = table.select("tr")
+    if len(rows) < 2:
+        return specs
+    headers = [slugify(clean(td.get_text())) for td in rows[0].select("td")]
+    values = [clean(td.get_text(separator=" ")) for td in rows[1].select("td")]
+    return dict(zip(headers, values))
+
+
+def _parse_location(soup) -> str:
+    tag = soup.select_one("span.specs-pickup-icon b")
+    return clean(tag.get_text()) if tag else ""
+
+
+def _parse_features(soup) -> list:
+    """Attached features from remarks section."""
+    return [
+        clean(li.get_text())
+        for li in soup.select("div.remarks li.attached_on")
+        if clean(li.get_text())
+    ]
+
+
+def _parse_images(soup) -> list:
+    """Full-size image URLs from hidden input fields."""
+    images, seen = [], set()
+    for inp in soup.select("input.fn-images-pc"):
+        path = inp.get("data-path", "")
+        if path and path not in seen:
+            url = ("https:" + path) if path.startswith("//") else path
+            images.append(url)
+            seen.add(path)
+    return images
+
+
+# ── Vehicle builder ───────────────────────────────────────────────────────────
+
+def parse_vehicle(soup, car_url: str) -> Vehicle:
+    title_ref = _parse_title_and_ref(soup)
+    pricing = _parse_pricing(soup)
+    specs = _parse_specs(soup)
+    pickup = _parse_pickup_specs(soup)
+    all_specs = {**pickup, **specs}         # pickup specs take lower priority
+
+    # Extract year from manufacture_yearmonth or year field
+    mfg_year = (
+        all_specs.get("manufacture_yearmonth", "").split("/")[0]
+        or all_specs.get("year", "").split("/")[0]
+        or all_specs.get("registration_yearmonth", "").split("/")[0]
+    ).strip()
+
+    v = Vehicle(
+        source=SOURCE,
+        car_url=car_url,
+        stock_id=title_ref.get("stock_id", ""),
+        chassis_no=clean_value(all_specs.get("chassis_no", "")),
+        title=title_ref.get("title", ""),
+        manufacturing_year=mfg_year,
+        make="",            # derived from title
+        model_name="",      # derived from title
+        model=all_specs.get("versionclass", ""),
+        body_type="",       # derived from title
+        model_code=clean_value(title_ref.get("model_code", "")),
+        grade=all_specs.get("versionclass", ""),
+        mileage=all_specs.get("mileage", ""),
+        engine=all_specs.get("engine_size", all_specs.get("engine", "")),
+        transmission=all_specs.get("transmission", all_specs.get("trans_", "")),
+        drive=all_specs.get("drive", ""),
+        steering=all_specs.get("steering", ""),
+        fuel=all_specs.get("fuel", ""),
+        doors=all_specs.get("doors", ""),
+        seats=all_specs.get("seats", ""),
+        exterior_color=all_specs.get("ext_color", "").title(),
+        dimension=all_specs.get("dimension", ""),
+        currency=pricing.get("currency", "$"),
+        vehicle_price=pricing.get("vehicle_price", ""),
+        total_price=pricing.get("total_price", ""),
+        freight_amount="",
+        inspection_amount="",
+        insurance_amount="",
+        destination_port=pricing.get("destination_port", ""),
+        location=_parse_location(soup),
+        features=_parse_features(soup),
+        image_urls=_parse_images(soup),
+    )
+    return enrich_vehicle(v)
+
+
+def scrape_vehicle(url: str, logger) -> Vehicle | None:
+    soup = fetch(url, logger=logger)
+    if soup is None:
+        logger.error(f"Failed: {url}")
+        return None
+    return parse_vehicle(soup, url)
+
+
+# ── Pipeline ──────────────────────────────────────────────────────────────────
+
+def run(max_pages: int = None) -> None:
+    logger = my_logger(SOURCE, log_dir=LOG_DIR)
+    logger.info("Starting scrape...")
+
+    urls = get_listing_urls(logger, max_pages)
+    if not urls:
+        logger.error("No URLs found.")
+        return
+
+    vehicles = []
+    total = len(urls)
+    for idx, url in enumerate(urls, 1):
+        logger.info(f"\nVehicle {idx}/{total}")
+        v = scrape_vehicle(url, logger)
+        if v:
+            vehicles.append(v.to_dict())
+            logger.info(f"  ✓ Saved — {v.make} {v.model_name}")
+        else:
+            logger.info(f"  ✗ Skipped — {url}")
+        time.sleep(REQUEST_DELAY)
+
+    save_to_json(vehicles, OUTPUT_DIR / f"{SOURCE}.json", logger)
+    logger.info(f"\nFinished\n{len(vehicles)} vehicles saved")
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--max-pages", type=int, default=None)
+    args = ap.parse_args()
+    run(max_pages=args.max_pages)
+
+
+================================================================
+===== FILE: pipeline/combine_json.py =====
+Loads all bronze JSONs, validates schema, normalizes missing
+values, deduplicates, and exports bronze/vehicles.json.
+================================================================
+
+#!/usr/bin/env python3
+"""
+combine_json.py — Merge all scraper outputs into one PostgreSQL-ready file.
+
+Usage:
+    python -m pipeline.combine_json
+"""
+
+import json
+import logging
+from pathlib import Path
+
+from utils.schema import REQUIRED_KEYS
+
+BRONZE_DIR = Path("bronze")
+OUTPUT_FILE = BRONZE_DIR / "vehicles.json"
+SOURCES = ["sbtjapan", "carsfromjapan", "beforward"]
+EMPTY_PLACEHOLDERS = {"—", "-", "N/A", "n/a", "None", "null"}
+
+logging.basicConfig(format="%(message)s", level=logging.INFO)
+logger = logging.getLogger("combine_json")
+
+
+# ── Steps ─────────────────────────────────────────────────────────────────────
+
+def load_bronze() -> list:
+    vehicles = []
+    for source in SOURCES:
+        path = BRONZE_DIR / f"{source}.json"
+        if not path.exists():
+            logger.warning(f"  Missing: {path}")
+            continue
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        records = list(data.values()) if isinstance(data, dict) else data
+        logger.info(f"  Loaded {len(records):>5} records ← {source}")
+        vehicles.extend(records)
+    return vehicles
+
+
+def validate_schema(vehicles: list) -> list:
+    """Ensure every record has exactly the required keys. Auto-fill gaps."""
+    issues = 0
+    for v in vehicles:
+        missing = REQUIRED_KEYS - set(v.keys())
+        if missing:
+            issues += 1
+            for key in missing:
+                v[key] = [] if key in ("features", "image_urls") else ""
+    if issues:
+        logger.warning(f"  {issues} records had missing keys (auto-filled)")
+    else:
+        logger.info("  All records match schema ✓")
+    return vehicles
+
+
+def normalize_missing(vehicles: list) -> list:
+    """Replace None and dash-style placeholders with clean empty values."""
+    for v in vehicles:
+        for key, val in v.items():
+            if val is None:
+                v[key] = [] if key in ("features", "image_urls") else ""
+            elif isinstance(val, str) and val.strip() in EMPTY_PLACEHOLDERS:
+                v[key] = ""
+    return vehicles
+
+
+def deduplicate(vehicles: list) -> list:
+    """Remove duplicates by car_url and chassis_no."""
+    seen_urls: set = set()
+    seen_chassis: set = set()
+    unique = []
+    removed = 0
+
+    for v in vehicles:
+        url = v.get("car_url", "")
+        chassis = v.get("chassis_no", "")
+
+        if url in seen_urls:
+            removed += 1
+            continue
+        if chassis and chassis in seen_chassis:
+            removed += 1
+            continue
+
+        seen_urls.add(url)
+        if chassis:
+            seen_chassis.add(chassis)
+        unique.append(v)
+
+    logger.info(f"  Removed {removed} duplicates")
+    return unique
+
+
+def save_combined(vehicles: list) -> None:
+    BRONZE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(vehicles, f, indent=2, ensure_ascii=False)
+    logger.info(f"  Saved → {OUTPUT_FILE}")
+
+
+# ── Pipeline ──────────────────────────────────────────────────────────────────
+
+def run() -> None:
+    logger.info("combine_json — merging all bronze sources\n")
+
+    logger.info("Loading bronze JSONs...")
+    vehicles = load_bronze()
+    logger.info(f"  Raw total: {len(vehicles)} records")
+
+    logger.info("\nValidating schema...")
+    vehicles = validate_schema(vehicles)
+
+    logger.info("\nNormalizing missing values...")
+    vehicles = normalize_missing(vehicles)
+
+    logger.info("\nDeduplicating...")
+    vehicles = deduplicate(vehicles)
+
+    logger.info(f"\nFinal count: {len(vehicles)} vehicles")
+    save_combined(vehicles)
+    logger.info("\nDone ✓")
+
+
+if __name__ == "__main__":
+    run()
+
+
+================================================================
+===== FILE: run_scrapers.py =====
+Main entry point — run one, two, or all three scrapers.
+================================================================
+
+#!/usr/bin/env python3
+"""
+run_scrapers.py — Entry point for the vehicle scraping pipeline.
+
+Usage examples:
+    python run_scrapers.py                       # run all scrapers + combine
+    python run_scrapers.py --source sbt          # SBT Japan only
+    python run_scrapers.py --source cfj          # Cars From Japan only
+    python run_scrapers.py --source bf           # BeForward only
+    python run_scrapers.py --max-pages 5         # cap each scraper at 5 pages
+    python run_scrapers.py --combine-only        # merge existing bronze files
+"""
+
+import argparse
+from pathlib import Path
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Vehicle scraping pipeline")
+    ap.add_argument(
+        "--source",
+        choices=["sbt", "cfj", "bf", "all"],
+        default="all",
+        help="Which scraper to run (default: all)",
+    )
+    ap.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="Max listing pages per scraper (default: unlimited)",
+    )
+    ap.add_argument(
+        "--combine-only",
+        action="store_true",
+        help="Skip scraping — only merge existing bronze files",
+    )
+    args = ap.parse_args()
+
+    Path("bronze").mkdir(exist_ok=True)
+
+    if not args.combine_only:
+        if args.source in ("sbt", "all"):
+            from scrapers.sbtjapan import run as sbt_run
+            sbt_run(max_pages=args.max_pages)
+
+        if args.source in ("cfj", "all"):
+            from scrapers.carsfromjapan import run as cfj_run
+            cfj_run(max_pages=args.max_pages or 10)
+
+        if args.source in ("bf", "all"):
+            from scrapers.beforward import run as bf_run
+            bf_run(max_pages=args.max_pages)
+
+    from pipeline.combine_json import run as combine_run
+    combine_run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+================================================================
+===== FILE: sql/bronze_schema.sql =====
+Raw ingestion layer — data exactly as produced by scrapers.
+All price and numeric fields stored as VARCHAR for fidelity.
+================================================================
+
+-- Bronze: raw scraper output, minimal transformation.
+
+CREATE SCHEMA IF NOT EXISTS bronze;
+
+CREATE TABLE IF NOT EXISTS bronze.vehicles (
+    id                  SERIAL          PRIMARY KEY,
+    source              VARCHAR(50)     NOT NULL,
+    car_url             TEXT            UNIQUE NOT NULL,
+    stock_id            VARCHAR(100),
+    chassis_no          VARCHAR(100),
+    title               TEXT,
+    manufacturing_year  VARCHAR(10),
+    make                VARCHAR(100),
+    model_name          VARCHAR(150),
+    model               VARCHAR(200),
+    body_type           VARCHAR(100),
+    model_code          VARCHAR(100),
+    grade               VARCHAR(200),
+    mileage             VARCHAR(60),
+    engine              VARCHAR(100),
+    transmission        VARCHAR(30),
+    drive               VARCHAR(30),
+    steering            VARCHAR(20),
+    fuel                VARCHAR(50),
+    doors               VARCHAR(5),
+    seats               VARCHAR(5),
+    exterior_color      VARCHAR(100),
+    dimension           VARCHAR(100),
+    currency            VARCHAR(10),
+    vehicle_price       VARCHAR(50),
+    total_price         VARCHAR(50),
+    freight_amount      VARCHAR(50),
+    inspection_amount   VARCHAR(50),
+    insurance_amount    VARCHAR(50),
+    destination_port    VARCHAR(150),
+    location            VARCHAR(200),
+    features            JSONB           DEFAULT '[]',
+    image_urls          JSONB           DEFAULT '[]',
+    ingested_at         TIMESTAMPTZ     DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS bronze_vehicles_source_idx
+    ON bronze.vehicles(source);
+
+CREATE INDEX IF NOT EXISTS bronze_vehicles_make_idx
+    ON bronze.vehicles(make);
+
+CREATE INDEX IF NOT EXISTS bronze_vehicles_car_url_idx
+    ON bronze.vehicles(car_url);
+
+-- Load from combined JSON (run after combine_json.py):
+-- COPY bronze.vehicles (source, car_url, stock_id, chassis_no, title,
+--     manufacturing_year, make, model_name, model, body_type, model_code,
+--     grade, mileage, engine, transmission, drive, steering, fuel, doors,
+--     seats, exterior_color, dimension, currency, vehicle_price, total_price,
+--     freight_amount, inspection_amount, insurance_amount, destination_port,
+--     location, features, image_urls)
+-- FROM '/path/to/bronze/vehicles.json';
+
+
+================================================================
+===== FILE: sql/silver_schema.sql =====
+Cleaned, type-cast, normalized layer.
+Numeric fields properly typed. Transmission/drive/fuel normalized.
+================================================================
+
+-- Silver: cleaned and type-cast records.
+
+CREATE SCHEMA IF NOT EXISTS silver;
+
+CREATE TABLE IF NOT EXISTS silver.vehicles (
+    id                  SERIAL          PRIMARY KEY,
+    bronze_id           INT             REFERENCES bronze.vehicles(id),
+
+    -- Identity
+    source              VARCHAR(50)     NOT NULL,
+    car_url             TEXT            UNIQUE NOT NULL,
+    stock_id            VARCHAR(100),
+    chassis_no          VARCHAR(100),
+
+    -- Title & derived
+    title               TEXT,
+    manufacturing_year  SMALLINT,
+    make                VARCHAR(100),
+    model_name          VARCHAR(150),
+    model               VARCHAR(200),
+    body_type           VARCHAR(100),
+
+    -- Vehicle details
+    model_code          VARCHAR(100),
+    grade               VARCHAR(200),
+    mileage_km          INT,            -- extracted numeric from mileage string
+    engine_cc           INT,            -- extracted numeric from engine string
+    transmission        VARCHAR(5),     -- AT | MT
+    drive               VARCHAR(5),     -- 2WD | 4WD
+    steering            VARCHAR(5),     -- RHD | LHD
+    fuel                VARCHAR(20),    -- Petrol | Diesel | Hybrid | Electric
+    doors               SMALLINT,
+    seats               SMALLINT,
+    exterior_color      VARCHAR(100),
+    dimension           VARCHAR(100),
+
+    -- Pricing
+    currency            VARCHAR(5),
+    vehicle_price_usd   NUMERIC(12, 2),
+    total_price_usd     NUMERIC(12, 2),
+    freight_usd         NUMERIC(12, 2),
+    inspection_usd      NUMERIC(12, 2),
+    insurance_usd       NUMERIC(12, 2),
+    destination_port    VARCHAR(150),
+    location            VARCHAR(200),
+
+    -- Collections
+    features            TEXT[],
+    image_urls          TEXT[],
+
+    processed_at        TIMESTAMPTZ     DEFAULT NOW()
+);
+
+-- Normalization — run after bronze ingestion:
+
+-- 1. Extract mileage_km (e.g. "42,000 km" → 42000)
+-- INSERT INTO silver.vehicles (bronze_id, source, car_url, ...)
+-- SELECT
+--     b.id,
+--     b.source,
+--     b.car_url,
+--     NULLIF(regexp_replace(b.mileage, '[^0-9]', '', 'g'), '')::INT AS mileage_km,
+--     NULLIF(regexp_replace(b.engine,  '[^0-9]', '', 'g'), '')::INT AS engine_cc,
+--     CASE
+--         WHEN UPPER(b.transmission) IN ('AT','AUTOMATIC','AUTO') THEN 'AT'
+--         WHEN UPPER(b.transmission) IN ('MT','MANUAL')           THEN 'MT'
+--         ELSE b.transmission
+--     END AS transmission,
+--     CASE
+--         WHEN b.drive ILIKE '%4WD%' OR b.drive ILIKE '%4x4%' OR b.drive ILIKE '%AWD%' THEN '4WD'
+--         WHEN b.drive ILIKE '%2WD%' OR b.drive ILIKE '%FWD%' OR b.drive ILIKE '%RWD%' THEN '2WD'
+--         ELSE b.drive
+--     END AS drive,
+--     CASE
+--         WHEN b.steering ILIKE '%right%' OR b.steering = 'RHD' THEN 'RHD'
+--         WHEN b.steering ILIKE '%left%'  OR b.steering = 'LHD' THEN 'LHD'
+--         ELSE b.steering
+--     END AS steering,
+--     CASE
+--         WHEN b.fuel ILIKE '%petrol%' OR b.fuel ILIKE '%gasoline%' THEN 'Petrol'
+--         WHEN b.fuel ILIKE '%diesel%'                              THEN 'Diesel'
+--         WHEN b.fuel ILIKE '%hybrid%'                              THEN 'Hybrid'
+--         WHEN b.fuel ILIKE '%electric%'                            THEN 'Electric'
+--         ELSE b.fuel
+--     END AS fuel,
+--     NULLIF(regexp_replace(b.vehicle_price, '[^0-9.]', '', 'g'), '')::NUMERIC AS vehicle_price_usd,
+--     NULLIF(regexp_replace(b.total_price,   '[^0-9.]', '', 'g'), '')::NUMERIC AS total_price_usd,
+--     NULLIF(b.doors, '')::SMALLINT AS doors,
+--     NULLIF(b.seats, '')::SMALLINT AS seats,
+--     ...
+-- FROM bronze.vehicles b;
+
+CREATE INDEX IF NOT EXISTS silver_vehicles_make_idx
+    ON silver.vehicles(make);
+CREATE INDEX IF NOT EXISTS silver_vehicles_year_idx
+    ON silver.vehicles(manufacturing_year);
+CREATE INDEX IF NOT EXISTS silver_vehicles_price_idx
+    ON silver.vehicles(vehicle_price_usd);
+CREATE INDEX IF NOT EXISTS silver_vehicles_source_idx
+    ON silver.vehicles(source);
+
+
+================================================================
+===== FILE: sql/gold_schema.sql =====
+Analytics-ready layer — materialized views for reporting.
+Covers: inventory, pricing, age, mileage, fuel, transmission.
+================================================================
+
+-- Gold: analytics views refreshed on demand.
+
+CREATE SCHEMA IF NOT EXISTS gold;
+
+-- ── Inventory by make ─────────────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.inventory_by_make AS
+SELECT
+    make,
+    COUNT(*)                            AS total_units,
+    ROUND(AVG(vehicle_price_usd), 2)    AS avg_price_usd,
+    MIN(vehicle_price_usd)              AS min_price_usd,
+    MAX(vehicle_price_usd)              AS max_price_usd,
+    MIN(manufacturing_year)             AS oldest_year,
+    MAX(manufacturing_year)             AS newest_year
+FROM silver.vehicles
+WHERE make IS NOT NULL AND make <> ''
+GROUP BY make
+ORDER BY total_units DESC;
+
+
+-- ── Inventory by source ───────────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.inventory_by_source AS
+SELECT
+    source,
+    COUNT(*)                            AS total_units,
+    ROUND(AVG(vehicle_price_usd), 2)    AS avg_price_usd,
+    MIN(vehicle_price_usd)              AS min_price_usd,
+    MAX(vehicle_price_usd)              AS max_price_usd
+FROM silver.vehicles
+GROUP BY source
+ORDER BY total_units DESC;
+
+
+-- ── Inventory by country / location ──────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.inventory_by_location AS
+SELECT
+    location,
+    COUNT(*)                            AS total_units,
+    ROUND(AVG(vehicle_price_usd), 2)    AS avg_price_usd
+FROM silver.vehicles
+WHERE location IS NOT NULL AND location <> ''
+GROUP BY location
+ORDER BY total_units DESC;
+
+
+-- ── Transmission distribution ─────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.transmission_stats AS
+SELECT
+    transmission,
+    COUNT(*)                                            AS units,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct
+FROM silver.vehicles
+WHERE transmission IS NOT NULL AND transmission <> ''
+GROUP BY transmission
+ORDER BY units DESC;
+
+
+-- ── Fuel type distribution ────────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.fuel_stats AS
+SELECT
+    fuel,
+    COUNT(*)                                            AS units,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS pct
+FROM silver.vehicles
+WHERE fuel IS NOT NULL AND fuel <> ''
+GROUP BY fuel
+ORDER BY units DESC;
+
+
+-- ── Vehicle age buckets ───────────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.age_distribution AS
+SELECT
+    CASE
+        WHEN (EXTRACT(YEAR FROM NOW()) - manufacturing_year) <= 2  THEN '0-2 years'
+        WHEN (EXTRACT(YEAR FROM NOW()) - manufacturing_year) <= 5  THEN '3-5 years'
+        WHEN (EXTRACT(YEAR FROM NOW()) - manufacturing_year) <= 10 THEN '6-10 years'
+        ELSE '10+ years'
+    END                                 AS age_bucket,
+    COUNT(*)                            AS units,
+    ROUND(AVG(vehicle_price_usd), 2)    AS avg_price_usd,
+    MIN(vehicle_price_usd)              AS min_price_usd,
+    MAX(vehicle_price_usd)              AS max_price_usd
+FROM silver.vehicles
+WHERE manufacturing_year IS NOT NULL
+GROUP BY age_bucket
+ORDER BY MIN(EXTRACT(YEAR FROM NOW()) - manufacturing_year);
+
+
+-- ── Mileage statistics by make ────────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.mileage_by_make AS
+SELECT
+    make,
+    COUNT(*)                            AS units,
+    ROUND(AVG(mileage_km))              AS avg_km,
+    MIN(mileage_km)                     AS min_km,
+    MAX(mileage_km)                     AS max_km
+FROM silver.vehicles
+WHERE mileage_km IS NOT NULL AND mileage_km > 0
+GROUP BY make
+ORDER BY avg_km;
+
+
+-- ── Destination port distribution ────────────────────────────────────────
+CREATE MATERIALIZED VIEW IF NOT EXISTS gold.destination_stats AS
+SELECT
+    destination_port,
+    COUNT(*)                            AS total_vehicles,
+    ROUND(AVG(vehicle_price_usd), 2)    AS avg_price_usd
+FROM silver.vehicles
+WHERE destination_port IS NOT NULL AND destination_port <> ''
+GROUP BY destination_port
+ORDER BY total_vehicles DESC;
+
+
+-- ── Refresh all gold views ────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION gold.refresh_all()
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.inventory_by_make;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.inventory_by_source;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.inventory_by_location;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.transmission_stats;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.fuel_stats;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.age_distribution;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.mileage_by_make;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY gold.destination_stats;
+END;
+$$;
+-- Call with: SELECT gold.refresh_all();
+
+
+================================================================
+===== FILE: README.md =====
+================================================================
+
+# Vehicle Scraping Pipeline
+
+Production-ready data pipeline for Japanese used car exporters.
+Three scrapers → Unified schema → PostgreSQL Medallion Architecture.
+
+---
+
+## Sources
+
+| Scraper | Site | Stock URL pattern |
+|---------|------|-------------------|
+| SBT Japan | sbtjapan.com | `/used-cars/{stock_id}` |
+| Cars From Japan | carfromjapan.com | `/cheap-used-{make}-{year}-for-sale-{id}` |
+| BeForward | beforward.jp | `/{make}/{model}/{variant}/id/{id}/` |
+
+---
+
+## Folder Structure
+
+```
+.
+├── run_scrapers.py           # main entry point
+├── requirements.txt
+├── scrapers/
+│   ├── base.py               # shared: fetch, logger, clean, save_to_json
+│   ├── sbtjapan.py
+│   ├── carsfromjapan.py
+│   └── beforward.py
+├── utils/
+│   ├── schema.py             # Vehicle dataclass (unified schema)
+│   ├── title_parser.py       # extract fields from listing titles
+│   └── helpers.py            # normalize_*, flatten_options, is_empty
+├── pipeline/
+│   └── combine_json.py       # merge + validate + deduplicate
+├── sql/
+│   ├── bronze_schema.sql     # raw ingestion table
+│   ├── silver_schema.sql     # cleaned + type-cast table
+│   └── gold_schema.sql       # analytics materialized views
+├── bronze/                   # auto-created — raw JSON per scraper
+│   ├── sbtjapan.json
+│   ├── carsfromjapan.json
+│   ├── beforward.json
+│   └── vehicles.json         # merged output
+└── logs/                     # per-scraper log files
+```
+
+---
+
+## Unified Schema (32 fields)
+
+Every record from every scraper contains exactly these keys:
+
+```
+source              car_url             stock_id            chassis_no
+title               manufacturing_year  make                model_name
+model               body_type           model_code          grade
+mileage             engine              transmission        drive
+steering            fuel                doors               seats
+exterior_color      dimension           currency            vehicle_price
+total_price         freight_amount      inspection_amount   insurance_amount
+destination_port    location            features            image_urls
+```
+
+---
+
+## Title Parser & Retention Rule
+
+`utils/title_parser.py` extracts `manufacturing_year`, `make`,
+`model_name`, `model`, and `body_type` from the raw title string.
+
+**Retention rule**: scraped values are NEVER overwritten.
+The parser only fills fields that are currently empty ("", None, "—", "N/A").
+
+| Source | Scraped directly | Derived from title |
+|--------|----------------|--------------------|
+| SBT Japan | make, model_name, manufacturing_year, body_type | model (if grade empty) |
+| Cars From Japan | mileage, engine, transmission, drive, steering, fuel... | make, model_name, manufacturing_year, body_type |
+| BeForward | mileage, engine, features, images... | make, model_name, body_type |
+
+---
+
+## Quick Start
+
+```bash
+pip install -r requirements.txt
+
+# Run all scrapers (cap at 5 pages for testing)
+python run_scrapers.py --max-pages 5
+
+# Run one source
+python run_scrapers.py --source sbt --max-pages 3
+
+# Merge existing bronze files only
+python run_scrapers.py --combine-only
+```
+
+---
+
+## PostgreSQL Ingestion
+
+```sql
+-- 1. Create schemas and tables
+\i sql/bronze_schema.sql
+\i sql/silver_schema.sql
+\i sql/gold_schema.sql
+
+-- 2. Load bronze (use psycopg2 or pgcopy with bronze/vehicles.json)
+
+-- 3. Normalize bronze → silver (uncomment INSERT in silver_schema.sql)
+
+-- 4. Refresh analytics views
+SELECT gold.refresh_all();
+```
+
+---
+
+## Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Unified Vehicle dataclass | Single schema contract — parsers, validators, and DB all reference one source of truth |
+| Title parser with retention rule | Backfills gaps in scraped data without destroying direct scraper values |
+| Flat `features` list | Simpler for downstream SQL queries vs nested category dict |
+| Bronze / Silver / Gold | Bronze = exact scraper output; Silver = type-safe analytics input; Gold = pre-aggregated BI views |
+| `vehicles.json` | Single combined file ready for bulk COPY into PostgreSQL |
+| No `scraped_at` | Removed per spec; ingested_at / processed_at timestamps live in the DB layers instead |
+
+---
+
+## Removed Fields
+
+All deprecated fields have been removed from scraper output and
+all related parsing logic has been deleted:
+
+```
+view_count          favourite_count     rating              reviews
+photo_count         manufacture_month   mileage_raw         thumbnail_url
+quote_type          cfj_id              vanning_amount      original_price
+auction_grade       scraped_at          make_id             vehicle_weight
+gross_vehicle_weight  max_loading_capacity  engine_code     m3
+car_options         (replaced by features)
+```
+
+================================================================
+END OF FILE
+================================================================

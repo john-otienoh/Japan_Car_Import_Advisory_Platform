@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import requests
+import warnings
 from datetime import datetime
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -31,16 +32,7 @@ HEADERS = {
 
 def my_logger(name, log_dir="logs"):
     """
-    Create a logger with both console and file output.
-    Log files are stored under `log_dir` with the pattern: {name}_YYYYMMDD_HHMMSS.log
-
-    Args:
-        name:     Logger name (usually the scraper's name).
-        log_dir:  Directory to store log files (default: "logs").
-
-    Returns:
-        logging.Logger instance.
-    """
+    Create a logger with both console and file output."""
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
@@ -72,18 +64,8 @@ def my_logger(name, log_dir="logs"):
     return logger
 
 def fetch(url, logger, retries = 3):
-    """
-    Fetch a URL and return a BeautifulSoup (lxml) object.
-    Retries on network errors or HTTP status codes >= 500.
+    """GET a URL and return BeautifulSoup. Returns None if all retries fail."""
 
-    Args:
-        url:     The URL to fetch.
-        retries: Maximum number of attempts.
-        logger:  Optional logger for debug/warning output.
-
-    Returns:
-        BeautifulSoup object or None if all retries fail.
-    """
     session = requests.Session()
     session.headers.update(HEADERS)
 
@@ -91,88 +73,48 @@ def fetch(url, logger, retries = 3):
         try:
             response = session.get(url)
             response.raise_for_status()
-            if logger:
-                logger.debug(f"Fetched {url} [HTTP {response.status_code}]")
-            return BeautifulSoup(response.text, "lxml")
+            logger.debug(f"Fetched {url} [HTTP {response.status_code}]")
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+                soup = BeautifulSoup(response.text, "lxml")
+
+            return soup
         except requests.RequestException as e:
-            if logger:
-                logger.warning(
-                    "Attempt %d/%d for %s failed: %s", attempt, retries, url, e
-                )
-    if logger:
-        logger.error("All %d attempts failed for %s", retries, url)
+            logger.warning("Attempt %d/%d for %s failed: %s", attempt, retries, url, e)
+    logger.error("All %d attempts failed for %s", retries, url)
     return None
 
 def clean(text):
-    """
-    Normalise whitespace: strip leading/trailing spaces,
-    collapse multiple spaces/tabs/newlines into a single space.
-
-    Args:
-        text: Input string (may be None).
-
-    Returns:
-        Cleaned string, or empty string if text is None.
-    """
+    """Normalise whitespace in extracted text."""
     if not text:
         return ""
     return re.sub(r"\s+", " ", text).strip()
 
 def save_to_json(data, path, logger):
-    """
-    Write Python data to a JSON file (UTF-8, pretty-printed).
+    """Write Python data to a JSON file (UTF-8, pretty-printed)."""
 
-    Args:
-        data:   Dictionary or list to serialise.
-        path:   Output file path.
-        logger: Optional logger to log the saved path.
-    """
-
-    output_path = Path(path)
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    if logger:
-        count = len(data) if isinstance(data, (dict, list)) else "?"
-        logger.info(f"Saved {count} record(s) to {output_path}")
+    count = len(data) if isinstance(data, (dict, list)) else "?"
+    logger.info(f"Saved {count} record(s) to {output_path}")
 
 def slugify(label):
-    """
-    Convert a human-readable label into a snake_case dict key.
-
-    Example::
-
-        slugify("Engine Capacity (cc)")  →  "engine_capacity_cc"
-
-    Args:
-        label: Raw label string.
-
-    Returns:
-        Lowercase, underscore-separated slug.
-    """
+    """Convert a human-readable label into a snake_case dict key."""
     label = clean(label).lower()
     label = re.sub(r"[^\w\s]", "", label)
     label = re.sub(r"\s+", "_", label)
     return label.strip("_")
 
-def get_project_root(marker=".git"):
-    """
-    Traverse upwards from the caller's file until a marker file/directory is found.
-    Typical markers: ".git", "README.md", "pyproject.toml", "requirements.txt".
 
-    Args:
-        marker: Filename or directory name that identifies the project root.
-
-    Returns:
-        Path to the project root. If marker is not found, returns the directory
-        two levels above this file (i.e. `base.py` → `scrappers/` → project root).
-    """
+def get_project_root(marker: str = ".git") -> Path:
+    """Walk upwards until a marker file/dir is found."""
     current = Path(__file__).resolve().parent
     while current != current.parent:
         if (current / marker).exists():
             return current
         current = current.parent
-    # return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]

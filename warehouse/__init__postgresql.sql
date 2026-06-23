@@ -17,13 +17,10 @@ CREATE DATABASE japan_car_import_database;
 
 \c japan_car_import_database;
 
-CREATE SCHEMA IF NOT EXISTS sbt_japan;
-CREATE SCHEMA IF NOT EXISTS car_from_japan; 
-CREATE SCHEMA IF NOT EXISTS aaa_japan;
-CREATE SCHEMA IF NOT EXISTS japanese_car_trade;
-CREATE SCHEMA IF NOT EXISTS be_forward;
+CREATE SCHEMA IF NOT EXISTS bronze;
 
 SELECT schema_name
 FROM Information_schema.schemata
 WHERE schema_name IN 
-    ("sbt_japan", "car_from_japan", "aaa_japan", "japanese_car_trade", "be_forward")
+    ("bronze", "silver", "gold")
+    
